@@ -50,13 +50,38 @@ export class AuthService {
     return this.initPromise;
   }
 
-  private async init(): Promise<void> {
+private async init(): Promise<void> {
     try {
+      const client = await this.auth0Client.getClient();
+
+      // 1. Interceptar el callback de Auth0 (si venimos de una redirección)
+      if (window.location.search.includes('code=') && window.location.search.includes('state=')) {
+        await client.handleRedirectCallback();
+        
+        // Limpiar la URL para no dejar parámetros sensibles a la vista
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        // Extraer el token de Auth0 y enviarlo al backend
+        const claims = await client.getIdTokenClaims();
+        const idToken = claims?.__raw;
+        
+        if (idToken) {
+          const response = await firstValueFrom(this.api.post<AuthResponse>('/auth/google', { idToken }));
+          this.persistRefreshToken(response.refreshToken);
+          this.user.set(response.user);
+          this.status.set('authenticated');
+          this.redirectingToLogin = false;
+          this.startHeartbeat();
+          return; // La sesión de Google se inició con éxito, terminamos el init.
+        }
+      }
+      // 2. Flujo normal (validación de sesión existente en el backend)
       const response = await firstValueFrom(this.api.get<AuthResponse>('/auth/me'));
       this.user.set(response.user);
       this.status.set('authenticated');
       this.redirectingToLogin = false;
       this.startHeartbeat();
+      
     } catch (error: any) {
       if (await this.refreshSession()) {
         return;
@@ -89,31 +114,14 @@ export class AuthService {
    * "Registrarse con Google": el backend decide si crea o reutiliza la cuenta.
    * Al terminar deja la misma sesión (cookie + refresh token) que el login tradicional.
    */
-  async loginWithGoogle(): Promise<void> {
+async loginWithGoogle(): Promise<void> {
     const client = await this.auth0Client.getClient();
-
-    try {
-      await client.loginWithPopup({ authorizationParams: { connection: 'google-oauth2' } });
-    } catch (err: any) {
-      if (err?.error === 'cancelled' || err?.error === 'popup_closed') {
-        // El usuario cerró la ventana de Google: no es un error que deba mostrarse.
-        return;
-      }
-      throw new Error('No se pudo completar el inicio de sesión con Google.');
-    }
-
-    const claims = await client.getIdTokenClaims();
-    const idToken = claims?.__raw;
-    if (!idToken) {
-      throw new Error('No se pudo obtener el token de Google.');
-    }
-
-    const response = await firstValueFrom(this.api.post<AuthResponse>('/auth/google', { idToken }));
-    this.persistRefreshToken(response.refreshToken);
-    this.user.set(response.user);
-    this.status.set('authenticated');
-    this.redirectingToLogin = false;
-    this.startHeartbeat();
+    await client.loginWithRedirect({ 
+      authorizationParams: { 
+        connection: 'google-oauth2',
+        redirect_uri: window.location.origin // Fuerza a que regrese a la raíz de tu app
+      } 
+    });
   }
 
   async logout(): Promise<void> {
