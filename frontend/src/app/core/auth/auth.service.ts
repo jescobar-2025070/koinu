@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../services/api.service';
 import { AuthResponse, ForgotPasswordResponse, User } from './auth.models';
+import { Auth0ClientService } from './auth0-client.service';
 
 export type AuthStatus = 'checking' | 'authenticated' | 'guest';
 
@@ -12,6 +13,7 @@ const REFRESH_TOKEN_KEY = 'koinu_refresh_token';
 export class AuthService {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly auth0Client = inject(Auth0ClientService);
 
   readonly user = signal<User | null>(null);
   readonly status = signal<AuthStatus>('checking');
@@ -79,6 +81,39 @@ export class AuthService {
 
   async register(email: string, password: string): Promise<void> {
     await firstValueFrom(this.api.post<AuthResponse>('/auth/register', { email, password }));
+  }
+
+  /**
+   * Inicia sesión (o registra, si la cuenta no existe) con Google mediante Auth0.
+   * Un mismo flujo sirve tanto para "Continuar con Google" como para
+   * "Registrarse con Google": el backend decide si crea o reutiliza la cuenta.
+   * Al terminar deja la misma sesión (cookie + refresh token) que el login tradicional.
+   */
+  async loginWithGoogle(): Promise<void> {
+    const client = await this.auth0Client.getClient();
+
+    try {
+      await client.loginWithPopup({ authorizationParams: { connection: 'google-oauth2' } });
+    } catch (err: any) {
+      if (err?.error === 'cancelled' || err?.error === 'popup_closed') {
+        // El usuario cerró la ventana de Google: no es un error que deba mostrarse.
+        return;
+      }
+      throw new Error('No se pudo completar el inicio de sesión con Google.');
+    }
+
+    const claims = await client.getIdTokenClaims();
+    const idToken = claims?.__raw;
+    if (!idToken) {
+      throw new Error('No se pudo obtener el token de Google.');
+    }
+
+    const response = await firstValueFrom(this.api.post<AuthResponse>('/auth/google', { idToken }));
+    this.persistRefreshToken(response.refreshToken);
+    this.user.set(response.user);
+    this.status.set('authenticated');
+    this.redirectingToLogin = false;
+    this.startHeartbeat();
   }
 
   async logout(): Promise<void> {

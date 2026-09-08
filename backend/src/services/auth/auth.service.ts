@@ -1,4 +1,4 @@
-import { pool, withTransaction } from '../../config/db';
+import { pool, withTransaction, PoolClient } from '../../config/db';
 import { AppError } from '../../errors/app-error';
 import { ErrorCodes } from '../../errors/error-codes';
 import { config } from '../../config/env';
@@ -22,6 +22,7 @@ import {
   PASSWORD_RESET_TOKEN_TTL_MS,
   REFRESH_TOKEN_TTL_MS,
 } from '../../utils/token.utils';
+import { GoogleIdTokenPayload, verifyGoogleIdToken } from '../../utils/auth0.utils';
 
 const DEFAULT_REGISTER_ROLE: RoleName = 'USR';
 
@@ -32,9 +33,11 @@ export interface SessionTokens {
 
 export class AuthService {
   private readonly userService: UserService;
+  private readonly verifyGoogleIdToken: (idToken: string) => Promise<GoogleIdTokenPayload>;
 
-  constructor() {
+  constructor(deps?: { verifyGoogleIdToken?: (idToken: string) => Promise<GoogleIdTokenPayload> }) {
     this.userService = new UserService(pool);
+    this.verifyGoogleIdToken = deps?.verifyGoogleIdToken ?? verifyGoogleIdToken;
   }
 
   async register(data: RegisterRequest): Promise<{ user: User; roles: RoleName[] }> {
@@ -50,34 +53,109 @@ export class AuthService {
 
     return withTransaction(async (client) => {
       const userRepository = new UserRepository(client);
-      const roleRepository = new RoleRepository(client);
-      const categoriaIngresoRepository = new CategoriaIngresoRepository(client);
-      const categoriaGastoRepository = new CategoriaGastoRepository(client);
-
-      const user = await userRepository.create({
-        email: data.email,
-        passwordHash,
-      });
-
-      const role = await roleRepository.findByName(DEFAULT_REGISTER_ROLE);
-      if (!role) {
-        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
-          message: 'El rol por defecto del sistema no está configurado.',
-          statusCode: 500,
-        });
-      }
-
-      await roleRepository.assignToUser(user.id, role.id);
-      await categoriaIngresoRepository.createDefaultsForUser(user.id);
-      await categoriaGastoRepository.createDefaultsForUser(user.id);
-
-      return { user, roles: [role.name] };
+      const user = await userRepository.create({ email: data.email, passwordHash });
+      return this.finishAccountCreation(client, user);
     });
+  }
+
+  /**
+   * Autentica (o registra, si no existe) a un usuario mediante un ID Token de
+   * Google emitido por Auth0. Reutiliza exactamente el mismo mecanismo de
+   * sesión (JWT + refresh token) que el login tradicional.
+   */
+  async loginWithGoogle(idToken: string): Promise<{ authUser: AuthUser; user: User } & SessionTokens> {
+    const payload = await this.verifyGoogleIdToken(idToken);
+
+    if (payload.emailVerified === false) {
+      throw new AppError(ErrorCodes.GOOGLE_EMAIL_NOT_VERIFIED, {
+        message: 'El correo de tu cuenta de Google no está verificado.',
+        statusCode: 403,
+      });
+    }
+
+    const account = await this.resolveGoogleAccount(payload);
+
+    if (!account.user.isActive) {
+      throw new AppError(ErrorCodes.ACCOUNT_DISABLED, {
+        message: 'La cuenta está desactivada. Contacta al administrador.',
+        statusCode: 403,
+      });
+    }
+
+    const tokens = await this.issueRefreshToken(account.user.id);
+
+    return {
+      authUser: toAuthUser(account.user, account.roles),
+      user: account.user,
+      ...tokens,
+    };
+  }
+
+  /**
+   * Determina si el `sub` de Google ya corresponde a un usuario (login), si el
+   * correo ya existe por el método tradicional (vincula la cuenta) o si debe
+   * crearse un usuario nuevo (registro), usando siempre `sub` como
+   * identificador estable y el correo solo como mecanismo de vinculación.
+   */
+  private async resolveGoogleAccount(
+    payload: GoogleIdTokenPayload,
+  ): Promise<{ user: User; roles: RoleName[] }> {
+    const userRepository = new UserRepository(pool);
+
+    const byGoogleSub = await userRepository.findByGoogleSub(payload.sub);
+    if (byGoogleSub) {
+      const roles = await new RoleRepository(pool).findRolesByUserId(byGoogleSub.id);
+      return { user: byGoogleSub, roles };
+    }
+
+    if (!payload.email) {
+      throw new AppError(ErrorCodes.GOOGLE_TOKEN_INVALID, {
+        message: 'No se pudo obtener el correo electrónico de la cuenta de Google.',
+        statusCode: 401,
+      });
+    }
+
+    const byEmail = await this.userService.getUserByEmailWithRoles(payload.email);
+    if (byEmail) {
+      const linked = await userRepository.linkGoogleSub(byEmail.user.id, payload.sub);
+      return { user: linked ?? byEmail.user, roles: byEmail.roles };
+    }
+
+    const email = payload.email;
+    return withTransaction(async (client) => {
+      const userRepo = new UserRepository(client);
+      const user = await userRepo.createGoogleUser({ email, googleSub: payload.sub });
+      return this.finishAccountCreation(client, user);
+    });
+  }
+
+  /** Asigna el rol y las categorías por defecto a un usuario recién creado (tradicional o Google). */
+  private async finishAccountCreation(
+    client: PoolClient,
+    user: User,
+  ): Promise<{ user: User; roles: RoleName[] }> {
+    const roleRepository = new RoleRepository(client);
+    const categoriaIngresoRepository = new CategoriaIngresoRepository(client);
+    const categoriaGastoRepository = new CategoriaGastoRepository(client);
+
+    const role = await roleRepository.findByName(DEFAULT_REGISTER_ROLE);
+    if (!role) {
+      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+        message: 'El rol por defecto del sistema no está configurado.',
+        statusCode: 500,
+      });
+    }
+
+    await roleRepository.assignToUser(user.id, role.id);
+    await categoriaIngresoRepository.createDefaultsForUser(user.id);
+    await categoriaGastoRepository.createDefaultsForUser(user.id);
+
+    return { user, roles: [role.name] };
   }
 
   async login(data: LoginRequest): Promise<{ authUser: AuthUser; user: User } & SessionTokens> {
     const account = await this.userService.getUserByEmailWithRoles(data.email);
-    if (!account || account.user.deletedAt) {
+    if (!account || account.user.deletedAt || !account.user.passwordHash) {
       throw this.invalidCredentials();
     }
 

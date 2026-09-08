@@ -24,9 +24,29 @@ export class Login {
   submitting = false;
   errorMessage = '';
   successMessage = '';
+  googleLoading = false;
 
   togglePassword(): void {
     this.showPassword = !this.showPassword;
+  }
+
+  async continueWithGoogle(): Promise<void> {
+    this.googleLoading = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    try {
+      await this.authService.loginWithGoogle();
+      if (this.authService.isAuthenticated()) {
+        await this.router.navigate(['/dashboard']);
+      }
+    } catch (error: any) {
+      this.errorMessage = 'No se pudo iniciar sesión con Google. Inténtelo nuevamente.';
+      this.cdr.markForCheck();
+    } finally {
+      this.googleLoading = false;
+      this.cdr.markForCheck();
+    }
   }
 
   async submit(): Promise<void> {

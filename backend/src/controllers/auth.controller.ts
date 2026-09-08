@@ -51,6 +51,22 @@ export class AuthController {
     }
   };
 
+  google = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { authUser, user, refreshToken, refreshTokenExpiresAt } = await this.authService.loginWithGoogle(
+        req.body.idToken,
+      );
+      setAuthCookie(res, signAuthToken(authUser));
+      res.status(200).json({
+        user: toUserResponse(user, authUser.roles),
+        refreshToken,
+        refreshTokenExpiresAt,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { authUser, user, refreshToken, refreshTokenExpiresAt } = await this.authService.refresh(

@@ -35,9 +35,28 @@ export class Register {
   protected errorMessage: string | null = null;
   protected submitting = false;
   protected showPassword = false;
+  protected googleLoading = false;
 
   protected togglePassword(): void {
     this.showPassword = !this.showPassword;
+  }
+
+  async continueWithGoogle(): Promise<void> {
+    this.googleLoading = true;
+    this.errorMessage = null;
+
+    try {
+      await this.authService.loginWithGoogle();
+      if (this.authService.isAuthenticated()) {
+        await this.router.navigate(['/dashboard']);
+      }
+    } catch (error: any) {
+      this.errorMessage = 'No se pudo completar el registro con Google. Inténtelo nuevamente.';
+      this.cdr.markForCheck();
+    } finally {
+      this.googleLoading = false;
+      this.cdr.markForCheck();
+    }
   }
 
   submit(): void {

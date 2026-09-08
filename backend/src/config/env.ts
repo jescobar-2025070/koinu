@@ -18,6 +18,8 @@ export interface AppConfig {
   cookieSecure: boolean;
   corsOrigin: string;
   bcryptRounds: number;
+  auth0Domain: string;
+  auth0ClientId: string;
 }
 
 function requireEnv(name: string, fallback?: string): string {
@@ -44,4 +46,9 @@ export const config: AppConfig = {
   cookieSecure: toBoolean(requireEnv('COOKIE_SECURE', 'false')),
   corsOrigin: requireEnv('CORS_ORIGIN', 'http://localhost:4200'),
   bcryptRounds: Number(requireEnv('BCRYPT_ROUNDS', '12')),
+  // Opcionales: solo requeridos para habilitar el login/registro con Google.
+  // Si no están configurados, /auth/google responderá con GOOGLE_AUTH_NOT_CONFIGURED
+  // y el resto de la autenticación (tradicional) sigue funcionando sin cambios.
+  auth0Domain: process.env.AUTH0_DOMAIN ?? '',
+  auth0ClientId: process.env.AUTH0_CLIENT_ID ?? '',
 };

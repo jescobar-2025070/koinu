@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { ApiService } from '../services/api.service';
 import { User } from './auth.models';
+import { Auth0ClientService } from './auth0-client.service';
 
 @Component({ template: '' })
 class LoginStub {}
@@ -24,17 +25,24 @@ interface MockApi {
   post: MockFn;
 }
 
+interface MockAuth0Client {
+  getClient: MockFn;
+}
+
 describe('AuthService', () => {
   let service: AuthService;
   let api: MockApi;
+  let auth0Client: MockAuth0Client;
 
   beforeEach(() => {
     localStorage.clear();
     api = { get: vi.fn(), post: vi.fn() };
+    auth0Client = { getClient: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         provideRouter([{ path: 'login', component: LoginStub }]),
         { provide: ApiService, useValue: api },
+        { provide: Auth0ClientService, useValue: auth0Client },
       ],
     });
     service = TestBed.inject(AuthService);
@@ -154,5 +162,50 @@ describe('AuthService', () => {
 
     service.clearSessionExpired();
     expect(service.sessionExpired()).toBe(false);
+  });
+
+  describe('loginWithGoogle', () => {
+    function mockAuth0Client(overrides: {
+      loginWithPopup?: MockFn;
+      getIdTokenClaims?: MockFn;
+    }): void {
+      const client = {
+        loginWithPopup: overrides.loginWithPopup ?? vi.fn().mockResolvedValue(undefined),
+        getIdTokenClaims: overrides.getIdTokenClaims ?? vi.fn().mockResolvedValue({ __raw: 'id-token-1' }),
+      };
+      auth0Client.getClient.mockResolvedValue(client);
+    }
+
+    it('autentica con el idToken de Auth0 y persiste la sesión, igual que el login tradicional', async () => {
+      mockAuth0Client({});
+      api.post.mockReturnValue(of({ user, refreshToken: 'rt-google-1' }));
+
+      await service.loginWithGoogle();
+
+      expect(api.post).toHaveBeenCalledWith('/auth/google', { idToken: 'id-token-1' });
+      expect(service.getRefreshToken()).toBe('rt-google-1');
+      expect(service.isAuthenticated()).toBe(true);
+      expect(service.user()).toEqual(user);
+    });
+
+    it('no lanza error ni cambia la sesión cuando el usuario cancela el popup de Google', async () => {
+      mockAuth0Client({
+        loginWithPopup: vi.fn().mockRejectedValue({ error: 'cancelled' }),
+      });
+
+      await expect(service.loginWithGoogle()).resolves.toBeUndefined();
+
+      expect(api.post).not.toHaveBeenCalled();
+      expect(service.isAuthenticated()).toBe(false);
+    });
+
+    it('propaga un error si el popup falla por una razón distinta a la cancelación', async () => {
+      mockAuth0Client({
+        loginWithPopup: vi.fn().mockRejectedValue({ error: 'unauthorized' }),
+      });
+
+      await expect(service.loginWithGoogle()).rejects.toThrow();
+      expect(api.post).not.toHaveBeenCalled();
+    });
   });
 });
