@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { ApiService } from '../services/api.service';
 import { User } from './auth.models';
@@ -100,9 +100,48 @@ describe('AuthService', () => {
     expect(service.user()).toEqual(user);
   });
 
-  it('refreshSession limpiando la sesión cuando falla', async () => {
+  it('refreshSession deduplica los refrescos simultáneos en uno solo', async () => {
     localStorage.setItem('koinu_refresh_token', 'rt-1');
-    api.post.mockReturnValue(throwError(() => new Error('red')));
+    const subject = new Subject<{ user: User; refreshToken: string }>();
+    api.post.mockReturnValue(subject);
+
+    const first = service.refreshSession();
+    const second = service.refreshSession();
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post).toHaveBeenCalledWith('/auth/refresh', { refreshToken: 'rt-1' });
+
+    subject.next({ user, refreshToken: 'rt-2' });
+    subject.complete();
+
+    expect(await first).toBe(true);
+    expect(await second).toBe(true);
+    expect(service.getRefreshToken()).toBe('rt-2');
+    expect(service.isAuthenticated()).toBe(true);
+  });
+
+  it('refreshSession limpia el token tras un fallo terminal y no reintenta sin él', async () => {
+    localStorage.setItem('koinu_refresh_token', 'rt-1');
+    api.post.mockReturnValue(
+      throwError(() => ({
+        error: { error: { code: 'REFRESH_TOKEN_EXPIRED', message: '...', details: {} } },
+      })),
+    );
+
+    expect(await service.refreshSession()).toBe(false);
+    expect(service.getRefreshToken()).toBeNull();
+
+    expect(await service.refreshSession()).toBe(false);
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshSession finaliza la sesión cuando el error de sesión es terminal', async () => {
+    localStorage.setItem('koinu_refresh_token', 'rt-1');
+    api.post.mockReturnValue(
+      throwError(() => ({
+        error: { error: { code: 'SESSION_IDLE_EXPIRED', message: '...', details: {} } },
+      })),
+    );
     service.user.set(user);
 
     expect(await service.refreshSession()).toBe(false);
@@ -110,6 +149,20 @@ describe('AuthService', () => {
     expect(service.isAuthenticated()).toBe(false);
     expect(service.user()).toBeNull();
     expect(service.getRefreshToken()).toBeNull();
+    expect(service.sessionExpired()).toBe(true);
+  });
+
+  it('refreshSession no elimina la sesión ante un error transitorio del servidor', async () => {
+    localStorage.setItem('koinu_refresh_token', 'rt-1');
+    api.post.mockReturnValue(throwError(() => new Error('network')));
+    service.user.set(user);
+    service.status.set('authenticated');
+
+    expect(await service.refreshSession()).toBe(false);
+
+    expect(service.isAuthenticated()).toBe(true);
+    expect(service.user()).toEqual(user);
+    expect(service.getRefreshToken()).toBe('rt-1');
   });
 
   it('ensureInitialized restaura la sesión vía /auth/me', async () => {
@@ -164,48 +217,121 @@ describe('AuthService', () => {
     expect(service.sessionExpired()).toBe(false);
   });
 
+  describe('inactividad de sesión', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      api.get.mockReturnValue(of({ user }));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('finaliza la sesión cuando no hay interacción del usuario dentro del límite', async () => {
+      api.post.mockReturnValue(of({ user, refreshToken: 'rt-1' }));
+      await service.login('a@b.c', 'secreto');
+      expect(service.isAuthenticated()).toBe(true);
+
+      vi.advanceTimersByTime(31 * 60 * 1000);
+
+      expect(service.sessionExpired()).toBe(true);
+      expect(service.isAuthenticated()).toBe(false);
+      expect(service.user()).toBeNull();
+      expect(service.getRefreshToken()).toBeNull();
+    });
+
+    it('la interacción del usuario mantiene la sesión activa pese al tiempo transcurrido', async () => {
+      api.post.mockReturnValue(of({ user, refreshToken: 'rt-1' }));
+      await service.login('a@b.c', 'secreto');
+
+      vi.advanceTimersByTime(29 * 60 * 1000);
+      window.dispatchEvent(new Event('keydown'));
+      vi.advanceTimersByTime(29 * 60 * 1000);
+
+      expect(service.sessionExpired()).toBe(false);
+      expect(service.isAuthenticated()).toBe(true);
+      expect(service.getRefreshToken()).toBe('rt-1');
+    });
+
+    it('no reacciona a la inactividad una vez finalizada la sesión', async () => {
+      api.post.mockReturnValue(of({ user, refreshToken: 'rt-1' }));
+      await service.login('a@b.c', 'secreto');
+
+      vi.advanceTimersByTime(31 * 60 * 1000);
+      expect(service.sessionExpired()).toBe(true);
+
+      vi.advanceTimersByTime(10 * 60 * 1000);
+
+      expect(service.isAuthenticated()).toBe(false);
+      expect(service.getRefreshToken()).toBeNull();
+    });
+
+    it('usa el límite de inactividad informado por el backend en lugar del default', async () => {
+      api.post.mockReturnValue(
+        of({ user, refreshToken: 'rt-1', sessionIdleTimeoutMs: 10 * 60 * 1000 }),
+      );
+      await service.login('a@b.c', 'secreto');
+
+      vi.advanceTimersByTime(11 * 60 * 1000);
+
+      expect(service.sessionExpired()).toBe(true);
+      expect(service.isAuthenticated()).toBe(false);
+      expect(service.getRefreshToken()).toBeNull();
+    });
+
+    it('pausa el latido durante la inactividad y lo reanuda con la interacción', async () => {
+      api.post.mockReturnValue(of({ user, refreshToken: 'rt-1' }));
+      await service.login('a@b.c', 'secreto');
+
+      vi.advanceTimersByTime(15 * 1000);
+      expect(api.get).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(60 * 1000);
+      expect(api.get).toHaveBeenCalledTimes(4);
+
+      vi.advanceTimersByTime(5 * 60 * 1000);
+      expect(api.get).toHaveBeenCalledTimes(4);
+
+      window.dispatchEvent(new Event('pointerdown'));
+      vi.advanceTimersByTime(15 * 1000);
+      expect(api.get).toHaveBeenCalledTimes(5);
+    });
+  });
+
   describe('loginWithGoogle', () => {
     function mockAuth0Client(overrides: {
-      loginWithPopup?: MockFn;
-      getIdTokenClaims?: MockFn;
+      loginWithRedirect?: MockFn;
     }): void {
       const client = {
-        loginWithPopup: overrides.loginWithPopup ?? vi.fn().mockResolvedValue(undefined),
-        getIdTokenClaims: overrides.getIdTokenClaims ?? vi.fn().mockResolvedValue({ __raw: 'id-token-1' }),
+        loginWithRedirect:
+          overrides.loginWithRedirect ?? vi.fn().mockResolvedValue(undefined),
       };
       auth0Client.getClient.mockResolvedValue(client);
     }
 
-    it('autentica con el idToken de Auth0 y persiste la sesión, igual que el login tradicional', async () => {
-      mockAuth0Client({});
-      api.post.mockReturnValue(of({ user, refreshToken: 'rt-google-1' }));
+    it('redirige a Auth0 con la conexión de Google y la URL de retorno actual', async () => {
+      const loginWithRedirect = vi.fn().mockResolvedValue(undefined);
+      mockAuth0Client({ loginWithRedirect });
 
       await service.loginWithGoogle();
 
-      expect(api.post).toHaveBeenCalledWith('/auth/google', { idToken: 'id-token-1' });
-      expect(service.getRefreshToken()).toBe('rt-google-1');
-      expect(service.isAuthenticated()).toBe(true);
-      expect(service.user()).toEqual(user);
+      expect(auth0Client.getClient).toHaveBeenCalledTimes(1);
+      expect(loginWithRedirect).toHaveBeenCalledWith({
+        authorizationParams: {
+          connection: 'google-oauth2',
+          redirect_uri: window.location.origin,
+        },
+      });
+      expect(api.post).not.toHaveBeenCalled();
     });
 
-    it('no lanza error ni cambia la sesión cuando el usuario cancela el popup de Google', async () => {
-      mockAuth0Client({
-        loginWithPopup: vi.fn().mockRejectedValue({ error: 'cancelled' }),
-      });
+    it('propaga un error si la redirección a Auth0 falla', async () => {
+      const loginWithRedirect = vi.fn().mockRejectedValue(new Error('auth0-down'));
+      mockAuth0Client({ loginWithRedirect });
 
-      await expect(service.loginWithGoogle()).resolves.toBeUndefined();
-
+      await expect(service.loginWithGoogle()).rejects.toThrow('auth0-down');
       expect(api.post).not.toHaveBeenCalled();
       expect(service.isAuthenticated()).toBe(false);
-    });
-
-    it('propaga un error si el popup falla por una razón distinta a la cancelación', async () => {
-      mockAuth0Client({
-        loginWithPopup: vi.fn().mockRejectedValue({ error: 'unauthorized' }),
-      });
-
-      await expect(service.loginWithGoogle()).rejects.toThrow();
-      expect(api.post).not.toHaveBeenCalled();
     });
   });
 });

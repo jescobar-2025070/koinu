@@ -126,7 +126,7 @@ describe('Login/registro con Google (Auth0) - lógica de cuenta', () => {
     const authService = authServiceWithFakePayload({ sub, email, emailVerified: true });
     const result = await authService.loginWithGoogle('fake-token');
 
-    const token = signAuthToken(result.authUser);
+    const token = signAuthToken(result.authUser, result.sessionId);
     const me = await request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${token}`);
     assert.equal(me.status, 200);
     assert.equal(me.body.user.email, email);

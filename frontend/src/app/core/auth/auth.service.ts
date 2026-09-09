@@ -2,12 +2,15 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../services/api.service';
-import { AuthResponse, ForgotPasswordResponse, User } from './auth.models';
+import { AuthResponse, ForgotPasswordResponse, User, isTerminalSessionError } from './auth.models';
 import { Auth0ClientService } from './auth0-client.service';
+import { environment } from '../config/environment';
 
 export type AuthStatus = 'checking' | 'authenticated' | 'guest';
 
 const REFRESH_TOKEN_KEY = 'koinu_refresh_token';
+
+const ACTIVITY_EVENTS = ['pointerdown', 'mousemove', 'keydown', 'touchstart'] as const;
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -26,11 +29,32 @@ export class AuthService {
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private redirectingToLogin = false;
 
+  private readonly IDLE_CHECK_INTERVAL_MS = 30000;
+  private readonly HEARTBEAT_PAUSE_AFTER_MS = 60000;
+  private sessionIdleTimeoutMs = environment.sessionIdleTimeoutMs;
+  private lastUserActivity = Date.now();
+  private idleCheck: ReturnType<typeof setInterval> | null = null;
+
+  private readonly markActivity = (): void => {
+    this.lastUserActivity = Date.now();
+    this.resumeHeartbeat();
+  };
+
   markSessionExpired(): void {
     if (this.redirectingToLogin) {
       return;
     }
     this.sessionExpired.set(true);
+  }
+
+  /**
+   * Una respuesta 401 con un estado de sesión terminal (expirada por tiempo,
+   * por inactividad o invalidada) finaliza la sesión y muestra el aviso de
+   * "SESIÓN EXPIRADA". No navega: el aviso ofrece volver al login.
+   */
+  handleSessionEnded(): void {
+    this.clearSession();
+    this.markSessionExpired();
   }
 
   clearSessionExpired(): void {
@@ -67,6 +91,7 @@ private async init(): Promise<void> {
         
         if (idToken) {
           const response = await firstValueFrom(this.api.post<AuthResponse>('/auth/google', { idToken }));
+          this.applySessionConfig(response);
           this.persistRefreshToken(response.refreshToken);
           this.user.set(response.user);
           this.status.set('authenticated');
@@ -77,6 +102,7 @@ private async init(): Promise<void> {
       }
       // 2. Flujo normal (validación de sesión existente en el backend)
       const response = await firstValueFrom(this.api.get<AuthResponse>('/auth/me'));
+      this.applySessionConfig(response);
       this.user.set(response.user);
       this.status.set('authenticated');
       this.redirectingToLogin = false;
@@ -86,10 +112,11 @@ private async init(): Promise<void> {
       if (await this.refreshSession()) {
         return;
       }
-      if (error?.error?.error?.code === 'TOKEN_EXPIRED') {
-        this.markSessionExpired();
+      if (isTerminalSessionError(error)) {
+        this.handleSessionEnded();
+      } else {
+        this.clearSession();
       }
-      this.clearSession();
     }
   }
 
@@ -97,6 +124,7 @@ private async init(): Promise<void> {
     const response = await firstValueFrom(
       this.api.post<AuthResponse>('/auth/login', { email, password }),
     );
+    this.applySessionConfig(response);
     this.persistRefreshToken(response.refreshToken);
     this.user.set(response.user);
     this.status.set('authenticated');
@@ -142,6 +170,15 @@ async loginWithGoogle(): Promise<void> {
   }
 
   async refreshSession(): Promise<boolean> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.performRefresh();
+    }
+    return this.refreshInFlight;
+  }
+
+  private refreshInFlight: Promise<boolean> | null = null;
+
+  private async performRefresh(): Promise<boolean> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
       return false;
@@ -150,15 +187,20 @@ async loginWithGoogle(): Promise<void> {
       const response = await firstValueFrom(
         this.api.post<AuthResponse>('/auth/refresh', { refreshToken }),
       );
+      this.applySessionConfig(response);
       this.persistRefreshToken(response.refreshToken);
       this.user.set(response.user);
       this.status.set('authenticated');
       this.redirectingToLogin = false;
       this.startHeartbeat();
       return true;
-    } catch {
-      this.clearSession();
+    } catch (error) {
+      if (isTerminalSessionError(error)) {
+        this.handleSessionEnded();
+      }
       return false;
+    } finally {
+      this.refreshInFlight = null;
     }
   }
 
@@ -189,12 +231,69 @@ async loginWithGoogle(): Promise<void> {
       return;
     }
     this.heartbeat = setInterval(() => void this.pingSession(), this.HEARTBEAT_INTERVAL_MS);
+    this.startIdleTracking();
+  }
+
+  private pauseHeartbeat(): void {
+    if (this.heartbeat) {
+      clearInterval(this.heartbeat);
+      this.heartbeat = null;
+    }
+  }
+
+  private resumeHeartbeat(): void {
+    if (this.status() !== 'authenticated' || this.heartbeat) {
+      return;
+    }
+    this.startHeartbeat();
   }
 
   private stopHeartbeat(): void {
     if (this.heartbeat) {
       clearInterval(this.heartbeat);
       this.heartbeat = null;
+      this.stopIdleTracking();
+    }
+  }
+
+  private startIdleTracking(): void {
+    if (this.idleCheck) {
+      return;
+    }
+    this.lastUserActivity = Date.now();
+    ACTIVITY_EVENTS.forEach((event) =>
+      window.addEventListener(event, this.markActivity, { passive: true }),
+    );
+    this.idleCheck = setInterval(() => this.checkIdle(), this.IDLE_CHECK_INTERVAL_MS);
+  }
+
+  private stopIdleTracking(): void {
+    if (this.idleCheck) {
+      clearInterval(this.idleCheck);
+      this.idleCheck = null;
+    }
+    ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, this.markActivity));
+  }
+
+  private checkIdle(): void {
+    if (this.status() !== 'authenticated') {
+      return;
+    }
+    const idleMs = Date.now() - this.lastUserActivity;
+    if (idleMs >= this.sessionIdleTimeoutMs) {
+      this.handleSessionEnded();
+      return;
+    }
+    if (idleMs >= this.HEARTBEAT_PAUSE_AFTER_MS) {
+      this.pauseHeartbeat();
+    } else {
+      this.resumeHeartbeat();
+    }
+  }
+
+  private applySessionConfig(response: AuthResponse): void {
+    if (response.sessionIdleTimeoutMs) {
+      this.sessionIdleTimeoutMs = response.sessionIdleTimeoutMs;
     }
   }
 

@@ -73,9 +73,11 @@ Con middleware de:
 
 ### Autenticación
 
-- El login genera un JWT firmado con `JWT_SECRET`, que incluye `sub` (id de usuario), `email` y `roles`. El JWT de acceso corto (cookie HttpOnly) se combina con un **refresh token** rotativo (tabla `refresh_tokens`, almacenado con hash): cada refresco revoca el token anterior y emite uno nuevo.
+- El login genera un JWT firmado con `JWT_SECRET`, que incluye `sub` (id de usuario), `email`, `roles` y `sid` (id de la sesión en `refresh_tokens`). El JWT de acceso corto (cookie HttpOnly) se combina con un **refresh token** rotativo (tabla `refresh_tokens`, almacenado con hash): cada refresco revoca el token anterior y emite uno nuevo.
+- La sesión tiene doble límite temporal: el refresh token caduca como máximo a los `JWT_REFRESH_EXPIRES_IN` de su emisión, y si transcurren más de `SESSION_IDLE_TIMEOUT` sin actividad (refresco o request autenticado), la sesión deja de poder renovarse (`SESSION_IDLE_EXPIRED`, 401) y hay que volver a iniciar sesión. La actividad de cada request autenticado actualiza `last_used_at` de la sesión.
+- El frontend combina el latido periódico (`GET /auth/me`) con la **interacción real del usuario**: mientras la sesión esté abierta, observa eventos de ratón, teclado y táctil y usa el límite de inactividad (`sessionIdleTimeoutMs`) que el backend devuelve en login/me/refresh/google. Si el usuario permanece inactivo más de ese límite aunque la pestaña esté abierta, la sesión se finaliza localmente (aviso de "SESIÓN EXPIRADA") y, además, el latido se pausa durante la inactividad para que el backend expire de verdad la sesión (`last_used_at` queda sin refrescar).
 - El JWT se envía en una cookie `HttpOnly` (`SameSite=Lax`). En producción la cookie es `Secure` (requiere HTTPS).
-- El frontend **no** almacena el token de acceso: al iniciar restaura la sesión consultando `GET /auth/me` y las peticiones envían la cookie automáticamente (`withCredentials: true`). El refresh token se conserva en `localStorage` (clave `koinu_refresh_token`) para renovar la sesión cuando el JWT expira.
+- El frontend **no** almacena el token de acceso: al iniciar restaura la sesión consultando `GET /auth/me` y las peticiones envían la cookie automáticamente (`withCredentials: true`). El refresh token se conserva en `localStorage` (clave `koinu_refresh_token`) para renovar la sesión cuando el JWT expira. El interceptor coordina los refrescos (uno solo a la vez) y reintenta las peticiones que fallaron con `401`.
 - **Recuperación de contraseña:** `POST /auth/forgot-password` genera un token de un solo uso con expiración (tabla `password_reset_tokens`, hash en base de datos) y `POST /auth/reset-password` lo consume para fijar la nueva contraseña. En desarrollo el token se devuelve en la respuesta para poder probar el flujo.
 - Tras login exitoso, se redirige automáticamente al dashboard.
 
@@ -243,7 +245,9 @@ Tras ejecutar `pnpm seed:full`:
 | `PORT` | Puerto HTTP del backend | `3000` | No (default `3000`) |
 | `DATABASE_URL` | Cadena de conexión a PostgreSQL | `postgresql://usuario:pass@localhost:5432/finanzas_dev` | Sí |
 | `JWT_SECRET` | Secreto para firmar los JWT | `valor-largo-y-aleatorio` | Sí |
-| `JWT_EXPIRES_IN` | Duración del token (formato `jsonwebtoken`) | `1h` | No |
+| `JWT_EXPIRES_IN` | Duración del access token JWT (formato `jsonwebtoken`) | `15m` | No |
+| `JWT_REFRESH_EXPIRES_IN` | Duración máxima absoluta del refresh token (límite superior de la sesión) | `7d` | No |
+| `SESSION_IDLE_TIMEOUT` | Tiempo máximo de inactividad antes de que la sesión deje de renovarse (formatos `ms/s/m/h/d`) | `30m` | No |
 | `COOKIE_NAME` | Nombre de la cookie HttpOnly | `finanzas_auth` | No |
 | `COOKIE_SECURE` | Cookie `Secure` (true solo en HTTPS) | `false` | No |
 | `CORS_ORIGIN` | Orígenes permitidos (separados por coma) | `http://localhost:4200` | No |
@@ -254,7 +258,7 @@ Tras ejecutar `pnpm seed:full`:
 
 ### Frontend
 
-- `src/app/core/config/environment.ts` → `apiUrl` (URL base de la API). Por defecto `http://localhost:3000/api/v1`.
+- `src/app/core/config/environment.ts` → `apiUrl` (URL base de la API) y `sessionIdleTimeoutMs` (inactividad máxima de interacción del usuario en `ms`; **solo como respaldo**: el valor autoritativo lo devuelve el backend en `login`/`me`/`refresh`/`google` y debe coincidir con `SESSION_IDLE_TIMEOUT`). Por defecto `http://localhost:3000/api/v1` y `30 * 60 * 1000`.
 
 ## Funcionalidades
 
@@ -322,7 +326,7 @@ Base: `http://localhost:3000/api/v1`
 | --- | --- | --- | --- |
 | `POST` | `/auth/register` | No | Registrar usuario (rol `USR`) |
 | `POST` | `/auth/login` | No | Iniciar sesión (cookie HttpOnly + refresh token en respuesta) |
-| `POST` | `/auth/refresh` | No | Rotar refresh token (revoca el anterior y emite uno nuevo) |
+| `POST` | `/auth/refresh` | No | Rotar refresh token (revoca el anterior, emite uno nuevo; rechaza sesiones expiradas o inactivas) |
 | `POST` | `/auth/logout` | Sí | Cerrar sesión |
 | `GET` | `/auth/me` | Sí | Obtener sesión actual |
 | `POST` | `/auth/forgot-password` | No | Solicitar recuperación de contraseña (token devuelto en desarrollo) |

@@ -4,10 +4,12 @@ import { config } from '../config/env';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
 import { pool } from '../config/db';
+import { RefreshTokenRepository } from '../repositories/refresh-token.repository';
 import { UserService } from '../services/users/user.service';
 import { toAuthUser } from '../mappers/user.mapper';
 
 const userService = new UserService(pool);
+const refreshTokenRepository = new RefreshTokenRepository(pool);
 
 function extractToken(req: Request): string | null {
   const cookieToken = req.cookies?.[config.cookieName];
@@ -72,20 +74,63 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
     return;
   }
 
-  void userService
-    .getUserWithRoles(userId)
-    .then((account) => {
-      if (!account) {
-        next(
-          new AppError(ErrorCodes.TOKEN_INVALID, {
-            message: 'El token de autenticación no es válido.',
-            statusCode: 401,
-          }),
-        );
-        return;
-      }
-      req.user = toAuthUser(account.user, account.roles);
-      next();
-    })
-    .catch(next);
+  const sessionId = payload.sid;
+  if (!sessionId) {
+    next(
+      new AppError(ErrorCodes.TOKEN_INVALID, {
+        message: 'El token de autenticación no es válido.',
+        statusCode: 401,
+      }),
+    );
+    return;
+  }
+
+  void (async () => {
+    const account = await userService.getUserWithRoles(userId);
+    if (!account) {
+      next(
+        new AppError(ErrorCodes.TOKEN_INVALID, {
+          message: 'El token de autenticación no es válido.',
+          statusCode: 401,
+        }),
+      );
+      return;
+    }
+
+    const session = await refreshTokenRepository.findById(sessionId);
+    if (!session || session.revokedAt) {
+      next(
+        new AppError(ErrorCodes.TOKEN_INVALID, {
+          message: 'La sesión ya no es válida. Vuelve a iniciar sesión.',
+          statusCode: 401,
+        }),
+      );
+      return;
+    }
+
+    if (new Date(session.expiresAt).getTime() <= Date.now()) {
+      next(
+        new AppError(ErrorCodes.REFRESH_TOKEN_EXPIRED, {
+          message: 'La sesión ha expirado. Vuelve a iniciar sesión.',
+          statusCode: 401,
+        }),
+      );
+      return;
+    }
+
+    const idleMs = Date.now() - new Date(session.lastUsedAt).getTime();
+    if (idleMs > config.sessionIdleTimeoutMs) {
+      next(
+        new AppError(ErrorCodes.SESSION_IDLE_EXPIRED, {
+          message: 'La sesión ha expirado por inactividad. Vuelve a iniciar sesión.',
+          statusCode: 401,
+        }),
+      );
+      return;
+    }
+
+    await refreshTokenRepository.updateLastUsedAt(sessionId, new Date());
+    req.user = toAuthUser(account.user, account.roles);
+    next();
+  })().catch(next);
 }

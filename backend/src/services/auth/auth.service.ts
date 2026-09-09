@@ -20,13 +20,15 @@ import {
   generateRawToken,
   hashToken,
   PASSWORD_RESET_TOKEN_TTL_MS,
-  REFRESH_TOKEN_TTL_MS,
+  parseDurationToMs,
 } from '../../utils/token.utils';
 import { GoogleIdTokenPayload, verifyGoogleIdToken } from '../../utils/auth0.utils';
 
 const DEFAULT_REGISTER_ROLE: RoleName = 'USR';
 
 export interface SessionTokens {
+  /** Id del registro en `refresh_tokens` que representa la sesión activa. */
+  sessionId: string;
   refreshToken: string;
   refreshTokenExpiresAt: Date;
 }
@@ -199,6 +201,15 @@ export class AuthService {
       });
     }
 
+    const idleMs = Date.now() - new Date(record.lastUsedAt).getTime();
+    if (idleMs > config.sessionIdleTimeoutMs) {
+      await repository.revoke(record.id);
+      throw new AppError(ErrorCodes.SESSION_IDLE_EXPIRED, {
+        message: 'La sesión ha expirado por inactividad. Vuelve a iniciar sesión.',
+        statusCode: 401,
+      });
+    }
+
     const account = await this.userService.getUserWithRoles(record.userId);
     if (!account) {
       throw new AppError(ErrorCodes.REFRESH_TOKEN_INVALID, {
@@ -231,15 +242,21 @@ export class AuthService {
   async issueRefreshToken(userId: string): Promise<SessionTokens> {
     const repository = new RefreshTokenRepository(pool);
     const rawToken = generateRawToken();
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + parseDurationToMs(config.jwtRefreshExpiresIn));
 
-    await repository.create({
+    const record = await repository.create({
       userId,
       tokenHash: hashToken(rawToken),
       expiresAt,
+      lastUsedAt: now,
     });
 
-    return { refreshToken: rawToken, refreshTokenExpiresAt: expiresAt };
+    return {
+      sessionId: record.id,
+      refreshToken: rawToken,
+      refreshTokenExpiresAt: expiresAt,
+    };
   }
 
   async requestPasswordReset(email: string): Promise<{ requested: boolean; resetToken: string | null }> {

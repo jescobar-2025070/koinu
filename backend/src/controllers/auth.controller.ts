@@ -39,12 +39,13 @@ export class AuthController {
 
   login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { authUser, user, refreshToken, refreshTokenExpiresAt } = await this.authService.login(req.body);
-      setAuthCookie(res, signAuthToken(authUser));
+      const { authUser, user, sessionId, refreshToken, refreshTokenExpiresAt } = await this.authService.login(req.body);
+      setAuthCookie(res, signAuthToken(authUser, sessionId));
       res.status(200).json({
         user: toUserResponse(user, authUser.roles),
         refreshToken,
         refreshTokenExpiresAt,
+        sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
       });
     } catch (error) {
       next(error);
@@ -53,14 +54,14 @@ export class AuthController {
 
   google = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { authUser, user, refreshToken, refreshTokenExpiresAt } = await this.authService.loginWithGoogle(
-        req.body.idToken,
-      );
-      setAuthCookie(res, signAuthToken(authUser));
+      const { authUser, user, sessionId, refreshToken, refreshTokenExpiresAt } =
+        await this.authService.loginWithGoogle(req.body.idToken);
+      setAuthCookie(res, signAuthToken(authUser, sessionId));
       res.status(200).json({
         user: toUserResponse(user, authUser.roles),
         refreshToken,
         refreshTokenExpiresAt,
+        sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
       });
     } catch (error) {
       next(error);
@@ -69,10 +70,10 @@ export class AuthController {
 
   refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { authUser, user, refreshToken, refreshTokenExpiresAt } = await this.authService.refresh(
+      const { authUser, user, sessionId, refreshToken, refreshTokenExpiresAt } = await this.authService.refresh(
         req.body.refreshToken,
       );
-      setAuthCookie(res, signAuthToken(authUser));
+      setAuthCookie(res, signAuthToken(authUser, sessionId));
       res.status(200).json({
         user: toUserResponse(user, authUser.roles),
         refreshToken,
@@ -105,7 +106,7 @@ export class AuthController {
           statusCode: 401,
         });
       }
-      res.status(200).json({ user: toUserResponse(account.user, account.roles) });
+      res.status(200).json({ user: toUserResponse(account.user, account.roles), sessionIdleTimeoutMs: config.sessionIdleTimeoutMs });
     } catch (error) {
       next(error);
     }
