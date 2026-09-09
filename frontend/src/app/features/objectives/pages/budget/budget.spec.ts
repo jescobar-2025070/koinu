@@ -11,6 +11,7 @@ import {
   Categoria,
   OverrunsData,
   Periodo,
+  RedistribucionPropuesta,
 } from '../../../../core/models/api.models';
 
 const periodo: Periodo = {
@@ -86,6 +87,36 @@ const overruns: OverrunsData = {
   ],
 };
 
+const redistribucion: RedistribucionPropuesta = {
+  redistribuible: true,
+  totalPresupuesto: 5000,
+  asignadoTotal: 2000,
+  excedenteTotal: 300,
+  holgura: 3000,
+  montoARedistribuir: 300,
+  ajustes: [
+    {
+      id: 'a-1',
+      categoriaGastoId: 'c-1',
+      categoriaNombre: 'Alimentación',
+      amountActual: 2000,
+      amountPropuesto: 2300,
+      delta: 300,
+    },
+  ],
+};
+
+const sinHolgura: RedistribucionPropuesta = {
+  redistribuible: false,
+  motivo: 'SIN_HOLGURA',
+  totalPresupuesto: 5000,
+  asignadoTotal: 5000,
+  excedenteTotal: 300,
+  holgura: 0,
+  montoARedistribuir: 0,
+  ajustes: [],
+};
+
 describe('ObjectivesBudget', () => {
   let fixture: ComponentFixture<ObjectivesBudget>;
   let component: ObjectivesBudget;
@@ -102,6 +133,8 @@ describe('ObjectivesBudget', () => {
       updateAllocation: vi.fn(),
       deleteAllocation: vi.fn(),
       getOverruns: vi.fn(),
+      getRedistribution: vi.fn(),
+      applyRedistribution: vi.fn(),
     };
     periodoService = { list: vi.fn() } as Mock<PeriodoService>;
     categoriaService = { listExpense: vi.fn() } as Mock<CategoriaService>;
@@ -128,6 +161,7 @@ describe('ObjectivesBudget', () => {
     budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
     budgetService.getBudget.mockResolvedValue(budgetData);
     budgetService.getOverruns.mockResolvedValue({ excedenteTotal: 0, excedentes: [] });
+    budgetService.getRedistribution.mockResolvedValue(sinHolgura);
 
     fixture.detectChanges();
     await settle();
@@ -152,6 +186,7 @@ describe('ObjectivesBudget', () => {
     budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
     budgetService.getBudget.mockResolvedValue(budgetData);
     budgetService.getOverruns.mockResolvedValue({ excedenteTotal: 0, excedentes: [] });
+    budgetService.getRedistribution.mockResolvedValue(sinHolgura);
 
     fixture.detectChanges();
     await settle();
@@ -208,6 +243,7 @@ describe('ObjectivesBudget', () => {
     budgetService.createBudget.mockResolvedValue({ id: 'b-1', periodoId: 'p-1', totalAmount: 0, createdAt: '', updatedAt: '' });
     budgetService.getBudget.mockResolvedValue(noBudget);
     budgetService.getOverruns.mockResolvedValue({ excedenteTotal: 0, excedentes: [] });
+    budgetService.getRedistribution.mockResolvedValue(sinHolgura);
     budgetService.createAllocation.mockResolvedValue({} as AsignacionPresupuesto);
 
     fixture.detectChanges();
@@ -228,6 +264,7 @@ describe('ObjectivesBudget', () => {
     budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
     budgetService.getBudget.mockResolvedValue(budgetData);
     budgetService.getOverruns.mockResolvedValue(overruns);
+    budgetService.getRedistribution.mockResolvedValue(sinHolgura);
 
     fixture.detectChanges();
     await settle();
@@ -245,6 +282,7 @@ describe('ObjectivesBudget', () => {
     budgetService.deleteAllocation.mockResolvedValue(undefined);
     budgetService.getBudget.mockResolvedValue(budgetData);
     budgetService.getOverruns.mockResolvedValue(overruns);
+    budgetService.getRedistribution.mockResolvedValue(sinHolgura);
     const allocation: AsignacionPresupuesto = budgetData.asignaciones[0];
 
     await component.deleteAllocation(allocation);
@@ -272,5 +310,89 @@ describe('ObjectivesBudget', () => {
 
   it('formatDate formatea en dd/mm/yyyy', () => {
     expect(component.formatDate('2026-01-10T12:00:00.000Z')).toBe('10/01/2026');
+  });
+
+  it('muestra la propuesta de redistribución cuando hay excedente y holgura', async () => {
+    periodoService.list.mockResolvedValue([periodo]);
+    categoriaService.listExpense.mockResolvedValue([categoria]);
+    budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
+    budgetService.getBudget.mockResolvedValue(budgetData);
+    budgetService.getOverruns.mockResolvedValue(overruns);
+    budgetService.getRedistribution.mockResolvedValue(redistribucion);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    expect(component.redistribution).toEqual(redistribucion);
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('REDISTRIBUCIÓN DE EXCEDENTES');
+    expect(text).toContain(component.formatCurrency(300));
+    expect(text).toContain(component.formatCurrency(2300));
+    expect(text).toContain('Aplicar redistribución');
+  });
+
+  it('muestra el motivo cuando la redistribución no está disponible', async () => {
+    periodoService.list.mockResolvedValue([periodo]);
+    categoriaService.listExpense.mockResolvedValue([categoria]);
+    budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
+    budgetService.getBudget.mockResolvedValue(budgetData);
+    budgetService.getOverruns.mockResolvedValue(overruns);
+    budgetService.getRedistribution.mockResolvedValue(sinHolgura);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    expect(component.redistributionMotivoText()).toContain('no queda holgura');
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('no queda holgura');
+    expect(text).not.toContain('Aplicar redistribución');
+  });
+
+  it('applyRedistribution confirma y llama al servicio, y recarga el presupuesto', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    periodoService.list.mockResolvedValue([periodo]);
+    categoriaService.listExpense.mockResolvedValue([categoria]);
+    budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
+    budgetService.getBudget.mockResolvedValue(budgetData);
+    budgetService.getOverruns.mockResolvedValue(overruns);
+    budgetService.getRedistribution.mockResolvedValue(redistribucion);
+    budgetService.applyRedistribution.mockResolvedValue(redistribucion);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    await component.applyRedistribution();
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(budgetService.applyRedistribution).toHaveBeenCalledWith('p-1');
+    expect(component.redistributionMsg).toBe('Redistribución aplicada.');
+    confirmSpy.mockRestore();
+  });
+
+  it('applyRedistribution no llama al servicio si la propuesta no es redistribuible', async () => {
+    component.selectedPeriodId = 'p-1';
+    component.redistribution = sinHolgura;
+
+    await component.applyRedistribution();
+
+    expect(budgetService.applyRedistribution).not.toHaveBeenCalled();
+  });
+
+  it('applyRedistribution muestra el mensaje de error del servidor', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    component.selectedPeriodId = 'p-1';
+    component.redistribution = redistribucion;
+    budgetService.applyRedistribution.mockRejectedValue({
+      error: { error: { message: 'No hay excedente que redistribuir o no hay holgura presupuestaria disponible.' } },
+    });
+
+    await component.applyRedistribution();
+
+    expect(budgetService.applyRedistribution).toHaveBeenCalledWith('p-1');
+    expect(component.redistributionMsg).toContain('No hay excedente que redistribuir');
+    confirmSpy.mockRestore();
   });
 });

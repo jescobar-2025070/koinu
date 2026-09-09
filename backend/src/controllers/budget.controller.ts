@@ -98,4 +98,30 @@ export class BudgetController {
       next(error);
     }
   };
+
+  getRedistribution = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = this.requireUser(req);
+      const redistribution = await this.budgetService.getRedistributionProposal(
+        req.params.periodId,
+        userId,
+      );
+      res.status(200).json({ redistribution });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  applyRedistribution = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = this.requireUser(req);
+      const redistribution = await this.budgetService.applyRedistribution(
+        req.params.periodId,
+        userId,
+      );
+      res.status(200).json({ redistribution });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
-import { AsignacionPresupuesto, BudgetData, OverrunsData, Presupuesto } from '../models/api.models';
+import { AsignacionPresupuesto, BudgetData, OverrunsData, Presupuesto, RedistribucionPropuesta } from '../models/api.models';
 
 @Injectable({ providedIn: 'root' })
 export class BudgetService {
@@ -40,5 +40,17 @@ export class BudgetService {
     return await firstValueFrom(
       this.api.get<{ overruns: OverrunsData }>(`/periods/${periodoId}/budget/overruns`),
     ).then((res) => res.overruns);
+  }
+
+  async getRedistribution(periodoId: string): Promise<RedistribucionPropuesta> {
+    return await firstValueFrom(
+      this.api.get<{ redistribution: RedistribucionPropuesta }>(`/periods/${periodoId}/budget/redistribution`),
+    ).then((res) => res.redistribution);
+  }
+
+  async applyRedistribution(periodoId: string): Promise<RedistribucionPropuesta> {
+    return await firstValueFrom(
+      this.api.post<{ redistribution: RedistribucionPropuesta }>(`/periods/${periodoId}/budget/redistribute`),
+    ).then((res) => res.redistribution);
   }
 }

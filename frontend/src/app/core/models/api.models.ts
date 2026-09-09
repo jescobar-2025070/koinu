@@ -120,6 +120,28 @@ export interface OverrunsData {
   excedentes: ExcedentePresupuesto[];
 }
 
+export type RedistribucionMotivo = 'SIN_PRESUPUESTO' | 'SIN_EXCEDENTE' | 'SIN_HOLGURA' | 'SIN_ASIGNACIONES';
+
+export interface RedistribucionAjuste {
+  id: string;
+  categoriaGastoId: string;
+  categoriaNombre: string;
+  amountActual: number;
+  amountPropuesto: number;
+  delta: number;
+}
+
+export interface RedistribucionPropuesta {
+  redistribuible: boolean;
+  motivo?: RedistribucionMotivo;
+  totalPresupuesto: number;
+  asignadoTotal: number;
+  excedenteTotal: number;
+  holgura: number;
+  montoARedistribuir: number;
+  ajustes: RedistribucionAjuste[];
+}
+
 export interface MovimientoStats {
   totalIngresos: number;
   totalGastos: number;

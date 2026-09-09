@@ -10,12 +10,37 @@ import { AsignacionPresupuestoRepository } from '../../repositories/asignacion-p
 import { ExcedentePresupuestoRepository } from '../../repositories/excedente-presupuesto.repository';
 import { CategoriaGastoRepository } from '../../repositories/categoria-gasto.repository';
 import { MovimientoRepository } from '../../repositories/movimiento.repository';
+import { CategoriaGasto } from '../../entities/categoria-gasto.entity';
 
 export interface PresupuestoConAsignaciones {
   presupuesto: Presupuesto | null;
   asignaciones: AsignacionPresupuesto[];
   asignadoTotal: number;
   excedenteTotal: number;
+}
+
+export interface RedistribucionAjuste {
+  id: string;
+  categoriaGastoId: string;
+  categoriaNombre: string;
+  amountActual: number;
+  amountPropuesto: number;
+  delta: number;
+}
+
+export interface RedistribucionPropuesta {
+  redistribuible: boolean;
+  motivo?: 'SIN_PRESUPUESTO' | 'SIN_EXCEDENTE' | 'SIN_HOLGURA' | 'SIN_ASIGNACIONES';
+  totalPresupuesto: number;
+  asignadoTotal: number;
+  excedenteTotal: number;
+  holgura: number;
+  montoARedistribuir: number;
+  ajustes: RedistribucionAjuste[];
+}
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
 export class BudgetService {
@@ -261,6 +286,164 @@ export class BudgetService {
     return {
       excedenteTotal: excedentes.reduce((sum, e) => sum + Number(e.amount), 0),
       excedentes,
+    };
+  }
+
+  async getRedistributionProposal(
+    periodoId: string,
+    userId: string,
+  ): Promise<RedistribucionPropuesta> {
+    await this.assertPeriodOwnership(periodoId, userId);
+
+    const presupuesto = await this.presupuestoRepository.findByPeriodo(periodoId);
+    if (!presupuesto) {
+      const totalPresupuesto = await this.netIncomeOf(periodoId);
+      return {
+        redistribuible: false,
+        motivo: 'SIN_PRESUPUESTO',
+        totalPresupuesto: round2(totalPresupuesto),
+        asignadoTotal: 0,
+        excedenteTotal: 0,
+        holgura: round2(totalPresupuesto),
+        montoARedistribuir: 0,
+        ajustes: [],
+      };
+    }
+
+    return this.buildRedistributionProposal(pool, presupuesto);
+  }
+
+  async applyRedistribution(
+    periodoId: string,
+    userId: string,
+  ): Promise<RedistribucionPropuesta> {
+    await this.assertPeriodOwnership(periodoId, userId);
+
+    const presupuesto = await this.presupuestoRepository.findByPeriodo(periodoId);
+    if (!presupuesto) {
+      throw new AppError(ErrorCodes.BUDGET_NOT_FOUND, {
+        message: 'Primero define un presupuesto para este período.',
+        statusCode: 404,
+      });
+    }
+
+    const inicial = await this.buildRedistributionProposal(pool, presupuesto);
+    if (!inicial.redistribuible) {
+      throw new AppError(ErrorCodes.BUDGET_REDISTRIBUTION_NOT_AVAILABLE, {
+        message: 'No hay excedente que redistribuir o no hay holgura presupuestaria disponible.',
+        statusCode: 422,
+      });
+    }
+
+    return withTransaction(async (client) => {
+      const presupuestoRepo = new PresupuestoRepository(client);
+      const actual = await presupuestoRepo.findByPeriodo(periodoId);
+      if (!actual) {
+        throw new AppError(ErrorCodes.BUDGET_NOT_FOUND, {
+          message: 'Primero define un presupuesto para este período.',
+          statusCode: 404,
+        });
+      }
+
+      const propuesta = await this.buildRedistributionProposal(client, actual);
+      if (!propuesta.redistribuible) {
+        throw new AppError(ErrorCodes.BUDGET_REDISTRIBUTION_NOT_AVAILABLE, {
+          message: 'No hay excedente que redistribuir o no hay holgura presupuestaria disponible.',
+          statusCode: 422,
+        });
+      }
+
+      const asignRepo = new AsignacionPresupuestoRepository(client);
+      for (const ajuste of propuesta.ajustes) {
+        const updated = await asignRepo.update(ajuste.id, ajuste.amountPropuesto);
+        if (!updated) {
+          throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+            message: 'Error al redistribuir la asignación.',
+            statusCode: 500,
+          });
+        }
+      }
+
+      return propuesta;
+    });
+  }
+
+  private async buildRedistributionProposal(
+    db: Db,
+    presupuesto: Presupuesto,
+  ): Promise<RedistribucionPropuesta> {
+    const asignacionRepo = new AsignacionPresupuestoRepository(db);
+    const excedenteRepo = new ExcedentePresupuestoRepository(db);
+    const movimientoRepo = new MovimientoRepository(db);
+    const categoriaRepo = new CategoriaGastoRepository(db);
+
+    const asignaciones = await asignacionRepo.findByPresupuesto(presupuesto.id);
+    const excedenteRows = await excedenteRepo.findByPresupuesto(presupuesto.id);
+    const excedenteTotal = excedenteRows.reduce((sum, e) => sum + Number(e.amount), 0);
+    const stats = await movimientoRepo.getStatsByPeriodo(presupuesto.periodoId);
+    const totalPresupuesto = Number(stats.totalIngresos);
+
+    const asignadoTotal = asignaciones.reduce((sum, a) => sum + Number(a.amount), 0);
+    const holgura = round2(Math.max(0, totalPresupuesto - asignadoTotal));
+    const montoARedistribuir = round2(Math.min(excedenteTotal, holgura));
+
+    const redistribuible = excedenteTotal > 0 && holgura > 0 && asignaciones.length > 0;
+
+    let ajustes: RedistribucionAjuste[] = [];
+    if (redistribuible) {
+      const totalCents = Math.round(montoARedistribuir * 100);
+      const pesosCents = asignaciones.map((a) => Math.round(Number(a.amount) * 100));
+      const pesoTotal = pesosCents.reduce((sum, p) => sum + p, 0);
+      const brutos = pesosCents.map((p) => (totalCents * p) / pesoTotal);
+      const deltaCents = brutos.map((x) => Math.floor(x));
+      let resto = totalCents - deltaCents.reduce((sum, x) => sum + x, 0);
+      if (resto > 0) {
+        const orden = brutos
+          .map((x, i) => ({ i, frac: x - Math.floor(x) }))
+          .sort((a, b) => b.frac - a.frac || a.i - b.i);
+        for (let k = 0; k < resto; k += 1) {
+          deltaCents[orden[k].i] += 1;
+        }
+      }
+
+      const categorias = await Promise.all(
+        asignaciones.map((a) => categoriaRepo.findById(a.categoriaGastoId)),
+      );
+      const nombrePorCategoria = new Map<string, string>(
+        categorias
+          .filter((c): c is CategoriaGasto => c !== null)
+          .map((c) => [c.id, c.name]),
+      );
+
+      ajustes = asignaciones.map((a, i) => {
+        const amountActual = round2(Number(a.amount));
+        const delta = round2(deltaCents[i] / 100);
+        return {
+          id: a.id,
+          categoriaGastoId: a.categoriaGastoId,
+          categoriaNombre: nombrePorCategoria.get(a.categoriaGastoId) ?? '—',
+          amountActual,
+          amountPropuesto: round2(amountActual + delta),
+          delta,
+        };
+      });
+    }
+
+    return {
+      redistribuible,
+      motivo: redistribuible
+        ? undefined
+        : excedenteTotal <= 0
+          ? 'SIN_EXCEDENTE'
+          : holgura <= 0
+            ? 'SIN_HOLGURA'
+            : 'SIN_ASIGNACIONES',
+      totalPresupuesto: round2(totalPresupuesto),
+      asignadoTotal: round2(asignadoTotal),
+      excedenteTotal: round2(excedenteTotal),
+      holgura,
+      montoARedistribuir,
+      ajustes,
     };
   }
 

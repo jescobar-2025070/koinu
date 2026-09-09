@@ -131,5 +131,62 @@
         <div class="budget-empty">Sin excedentes hasta ahora: tus gastos están dentro del presupuesto.</div>
       }
     </div>
+
+    <div class="panel">
+      <div class="panel-title">REDISTRIBUCIÓN DE EXCEDENTES</div>
+      @if (redistribution?.redistribuible) {
+        <div class="summary-row">
+          <div class="summary-item">
+            <span class="stat-label">EXCEDENTE TOTAL</span>
+            <span class="stat-value negative">{{ formatCurrency(redistribution!.excedenteTotal) }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="stat-label">HOLGURA DISPONIBLE</span>
+            <span class="stat-value">{{ formatCurrency(redistribution!.holgura) }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="stat-label">A REDISTRIBUIR</span>
+            <span class="stat-value cyan">{{ formatCurrency(redistribution!.montoARedistribuir) }}</span>
+          </div>
+        </div>
+        <div class="budget-hint">El excedente se distribuye proporcionalmente entre las asignaciones existentes.</div>
+        <table class="budget-table">
+          <thead>
+            <tr>
+              <th>CATEGORÍA</th>
+              <th>ACTUAL</th>
+              <th>PROPUESTO</th>
+              <th>INCREMENTO</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ajuste of redistribution!.ajustes; track ajuste.id) {
+              <tr>
+                <td>{{ ajuste.categoriaNombre }}</td>
+                <td>{{ formatCurrency(ajuste.amountActual) }}</td>
+                <td>{{ formatCurrency(ajuste.amountPropuesto) }}</td>
+                <td class="cyan">+{{ formatCurrency(ajuste.delta) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <div class="allocation-form" style="margin-top: 12px;">
+          <button
+            class="btn-primary"
+            (click)="applyRedistribution()"
+            [disabled]="redistributing || !isActivePeriod()"
+          >
+            Aplicar redistribución
+          </button>
+        </div>
+        <div class="save-msg">{{ redistributionMsg }}</div>
+      } @else {
+        @if (redistribution) {
+          <div class="budget-empty">{{ redistributionMotivoText() }}</div>
+        } @else {
+          <div class="budget-empty">Cargando propuesta…</div>
+        }
+      }
+    </div>
   }
 </div>

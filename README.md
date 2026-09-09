@@ -333,7 +333,7 @@ Debido a decisiones aprobadas por el usuario durante la Fase 6, la implementaci�
 Base: `http://localhost:3000/api/v1`
 
 > **Nomenclatura de la API (B1):** los endpoints usan nombres en español y camelCase. El diseño original proponía nombres en inglés; el mapeo es el siguiente:
-> `GET /objectives` (no `/goals`), `POST /objectives`, `PATCH /objectives/:id`; `GET /categories/income` (no `/income-categories`) y `GET /categories/expense` (no `/expense-categories`); `GET /periods/:periodId/budget/overruns` (excedentes de presupuesto). Respuestas devueltas envueltas en la clave del recurso: `{ usuario }`, `{ categoria }`, `{ movimiento }`, `{ periodo }`, `{ presupuesto }`, `{ overruns }`, `{ dashboard }`, `{ report }`, `{ auditoria }`, y listas en `{ categorias }`, `{ usuarios }`, `{ periodos }`, `{ roles }`, `{ asignaciones }`.
+> `GET /objectives` (no `/goals`), `POST /objectives`, `PATCH /objectives/:id`; `GET /categories/income` (no `/income-categories`) y `GET /categories/expense` (no `/expense-categories`); `GET /periods/:periodId/budget/overruns` (excedentes de presupuesto). Respuestas devueltas envueltas en la clave del recurso: `{ usuario }`, `{ categoria }`, `{ movimiento }`, `{ periodo }`, `{ presupuesto }`, `{ overruns }`, `{ redistribution }`, `{ dashboard }`, `{ report }`, `{ auditoria }`, y listas en `{ categorias }`, `{ usuarios }`, `{ periodos }`, `{ roles }`, `{ asignaciones }`.
 
 ### Autenticación
 
@@ -380,6 +380,8 @@ Base: `http://localhost:3000/api/v1`
 | `PATCH` | `/periods/budget-allocations/:id` | Sí | Actualizar monto de asignación |
 | `DELETE` | `/periods/budget-allocations/:id` | Sí | Eliminar asignación |
 | `GET` | `/periods/:periodId/budget/overruns` | Sí | Excedentes acumulados por fecha |
+| `GET` | `/periods/:periodId/budget/redistribution` | Sí | Propuesta de redistribución del excedente entre las asignaciones existentes (prorrateo proporcional, limitado a la holgura disponible) |
+| `POST` | `/periods/:periodId/budget/redistribute` | Sí | Aplicar la redistribución propuesta (actualiza las asignaciones) |
 
 ### Informes
 

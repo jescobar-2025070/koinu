@@ -10,6 +10,7 @@ import {
   Categoria,
   ExcedentePresupuesto,
   Periodo,
+  RedistribucionPropuesta,
 } from '../../../../core/models/api.models';
 
 @Component({
@@ -38,6 +39,10 @@ export class ObjectivesBudget implements OnInit {
   overruns: ExcedentePresupuesto[] = [];
   overrunsTotal = 0;
 
+  redistribution: RedistribucionPropuesta | null = null;
+  redistributing = false;
+  redistributionMsg = '';
+
   ngOnInit(): void {
     this.sidebarService.setObjectives();
     this.loadPeriods();
@@ -59,6 +64,8 @@ export class ObjectivesBudget implements OnInit {
     this.budget = null;
     this.overruns = [];
     this.allocationMsg = '';
+    this.redistribution = null;
+    this.redistributionMsg = '';
     void this.loadBudget();
   }
 
@@ -68,13 +75,15 @@ export class ObjectivesBudget implements OnInit {
     }
     try {
       await this.budgetService.createBudget(this.selectedPeriodId);
-      const [budget, overruns] = await Promise.all([
+      const [budget, overruns, redistribution] = await Promise.all([
         this.budgetService.getBudget(this.selectedPeriodId),
         this.budgetService.getOverruns(this.selectedPeriodId),
+        this.budgetService.getRedistribution(this.selectedPeriodId),
       ]);
       this.budget = budget;
       this.overrunsTotal = overruns.excedenteTotal;
       this.overruns = overruns.excedentes;
+      this.redistribution = redistribution;
       this.cdr.markForCheck();
     } catch (e) {
       console.error('Error loading budget:', e);
@@ -141,6 +150,45 @@ export class ObjectivesBudget implements OnInit {
       await this.loadBudget();
     } catch (e: any) {
       this.allocationMsg = e?.error?.error?.message || 'No se pudo eliminar la asignación.';
+      this.cdr.markForCheck();
+    }
+  }
+
+  redistributionMotivoText(): string {
+    switch (this.redistribution?.motivo) {
+      case 'SIN_PRESUPUESTO':
+        return 'El presupuesto aún no está definido para este período.';
+      case 'SIN_EXCEDENTE':
+        return 'No hay excedentes de gasto sobre el presupuesto para redistribuir.';
+      case 'SIN_HOLGURA':
+        return 'Ya has asignado todo el presupuesto; no queda holgura disponible.';
+      case 'SIN_ASIGNACIONES':
+        return 'Agrega asignaciones por categoría para poder redistribuir.';
+      default:
+        return '';
+    }
+  }
+
+  async applyRedistribution(): Promise<void> {
+    if (!this.selectedPeriodId || !this.redistribution?.redistribuible) {
+      return;
+    }
+    const confirmed = window.confirm(
+      `¿Aplicar la redistribución de ${this.formatCurrency(this.redistribution.montoARedistribuir)} a las asignaciones? Esta acción no se puede deshacer.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+    this.redistributing = true;
+    this.redistributionMsg = '';
+    try {
+      await this.budgetService.applyRedistribution(this.selectedPeriodId);
+      this.redistributionMsg = 'Redistribución aplicada.';
+      await this.loadBudget();
+    } catch (e: any) {
+      this.redistributionMsg = e?.error?.error?.message || 'No se pudo aplicar la redistribución.';
+    } finally {
+      this.redistributing = false;
       this.cdr.markForCheck();
     }
   }
