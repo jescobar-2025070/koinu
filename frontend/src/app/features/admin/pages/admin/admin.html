@@ -20,6 +20,23 @@
   <div class="glass-card admin__users">
     <h2 class="text-title-md">Gestión de usuarios</h2>
 
+    <div class="admin-create">
+      <div class="admin-create__title">Crear usuario</div>
+      <div class="admin-create__fields">
+        <input class="glow-pill" type="email" placeholder="Correo electrónico" [(ngModel)]="newUserEmail">
+        <input class="glow-pill" type="password" placeholder="Contraseña (mín. 8, con letra y número)" [(ngModel)]="newUserPassword">
+        <label class="role-check">
+          <input type="checkbox" [(ngModel)]="newUserAdmin"> ADMIN
+        </label>
+        <button class="btn-mini" (click)="createUser()" [disabled]="creatingUser">
+          {{ creatingUser ? 'Creando…' : 'Crear usuario' }}
+        </button>
+      </div>
+      @if (createMsg) {
+        <p class="admin-create__msg">{{ createMsg }}</p>
+      }
+    </div>
+
     @if (loading) {
       <p class="text-body-md text-on-surface-variant">Cargando usuarios…</p>
     } @else if (users.length === 0) {
@@ -62,9 +79,11 @@
               </td>
               <td>{{ formatDate(u.createdAt) }}</td>
               <td class="actions-cell">
+                <button class="btn-mini" (click)="updateEmail(u)" [disabled]="!!busy.get(u.id)">Editar correo</button>
                 <button class="btn-mini" (click)="toggleActive(u)" [disabled]="isSelf(u.id) || !!busy.get(u.id)">
                   {{ u.isActive ? 'Desactivar' : 'Activar' }}
                 </button>
+                <button class="btn-mini" (click)="resetPassword(u)" [disabled]="!!busy.get(u.id)">Cambiar contraseña</button>
                 <button class="btn-mini danger" (click)="deleteUser(u)" [disabled]="isSelf(u.id) || !!busy.get(u.id)">Eliminar</button>
               </td>
             </tr>

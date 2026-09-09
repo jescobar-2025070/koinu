@@ -25,4 +25,18 @@ export class AdminService {
   async deleteUser(id: string): Promise<void> {
     await firstValueFrom(this.api.delete(`/users/${id}`));
   }
+
+  async createUser(email: string, password: string, roles: string[]): Promise<User> {
+    const res = await firstValueFrom(this.api.post<{ user: User }>('/users', { email, password, roles }));
+    return res.user;
+  }
+
+  async updateEmail(id: string, email: string): Promise<User> {
+    const res = await firstValueFrom(this.api.patch<{ user: User }>(`/users/${id}`, { email }));
+    return res.user;
+  }
+
+  async resetPassword(id: string, password: string): Promise<void> {
+    await firstValueFrom(this.api.post(`/users/${id}/reset-password`, { password }));
+  }
 }

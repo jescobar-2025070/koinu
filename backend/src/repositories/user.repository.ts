@@ -109,6 +109,17 @@ export class UserRepository {
     return result.rows[0] ? mapRow(result.rows[0]) : null;
   }
 
+  async updateEmail(id: string, email: string): Promise<User | null> {
+    const result = await this.db.query<UserRow>(
+      `UPDATE users
+          SET email = $2, updated_at = NOW()
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING ${USER_COLUMNS}`,
+      [id, email],
+    );
+    return result.rows[0] ? mapRow(result.rows[0]) : null;
+  }
+
   async setActive(id: string, isActive: boolean): Promise<User | null> {
     const result = await this.db.query<UserRow>(
       `UPDATE users

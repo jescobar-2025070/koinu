@@ -34,6 +34,48 @@ export class UserController {
     }
   };
 
+  create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { user, roles } = await this.userService.createUser(req.body);
+      res.status(201).json({ user: toUserResponse(user, roles) });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.userService.getUserWithRoles(req.params.id);
+      if (!result) {
+        throw new AppError(ErrorCodes.USER_NOT_FOUND, {
+          message: 'Usuario no encontrado.',
+          statusCode: 404,
+        });
+      }
+      res.status(200).json({ user: toUserResponse(result.user, result.roles) });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { user, roles } = await this.userService.updateUserEmail(req.params.id, req.body.email);
+      res.status(200).json({ user: toUserResponse(user, roles) });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await this.userService.resetUserPassword(req.params.id, req.body.password);
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  };
+
   setActive = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = this.requireUser(req);

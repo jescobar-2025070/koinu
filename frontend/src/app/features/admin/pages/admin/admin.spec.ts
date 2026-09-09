@@ -42,6 +42,9 @@ describe('Admin', () => {
   beforeEach(() => {
     adminService = {
       listUsers: vi.fn(),
+      createUser: vi.fn(),
+      updateEmail: vi.fn(),
+      resetPassword: vi.fn(),
       setActive: vi.fn(),
       setRoles: vi.fn(),
       deleteUser: vi.fn(),
@@ -162,5 +165,89 @@ describe('Admin', () => {
 
     expect(adminService.deleteUser).toHaveBeenCalledWith('u-2');
     expect(component.users).toEqual([adminUser]);
+  });
+
+  it('createUser valida que existan correo y contraseña', async () => {
+    component.newUserEmail = '';
+    component.newUserPassword = '';
+
+    await component.createUser();
+
+    expect(adminService.createUser).not.toHaveBeenCalled();
+    expect(component.createMsg).toContain('Indica correo y contraseña');
+  });
+
+  it('createUser crea el usuario, lo agrega a la lista y limpia el formulario', async () => {
+    const created: User = {
+      id: 'u-3',
+      email: 'nuevo@finanzas.local',
+      isActive: true,
+      roles: ['USR'],
+      createdAt: '2026-01-03T00:00:00.000Z',
+    };
+    adminService.createUser.mockResolvedValue(created);
+    component.newUserEmail = 'nuevo@finanzas.local';
+    component.newUserPassword = 'Contrasena123';
+    component.newUserAdmin = false;
+
+    await component.createUser();
+
+    expect(adminService.createUser).toHaveBeenCalledWith('nuevo@finanzas.local', 'Contrasena123', ['USR']);
+    expect(component.users[0]).toEqual(created);
+    expect(component.rolesModel.get('u-3')).toEqual({ ADMIN: false, USR: true });
+    expect(component.newUserEmail).toBe('');
+    expect(component.newUserPassword).toBe('');
+  });
+
+  it('createUser asigna rol ADMIN si está marcado', async () => {
+    const created: User = { ...otherUser, id: 'u-4', roles: ['ADMIN', 'USR'] };
+    adminService.createUser.mockResolvedValue(created);
+    component.newUserEmail = 'admin2@finanzas.local';
+    component.newUserPassword = 'Contrasena123';
+    component.newUserAdmin = true;
+
+    await component.createUser();
+
+    expect(adminService.createUser).toHaveBeenCalledWith('admin2@finanzas.local', 'Contrasena123', ['ADMIN', 'USR']);
+  });
+
+  it('updateEmail cancela si el prompt no devuelve valor', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue(null);
+
+    await component.updateEmail(otherUser);
+
+    expect(adminService.updateEmail).not.toHaveBeenCalled();
+  });
+
+  it('updateEmail actualiza el correo de la fila', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('nuevo@koinu.local');
+    const updated = { ...otherUser, email: 'nuevo@koinu.local' };
+    adminService.updateEmail.mockResolvedValue(updated);
+    component.users = [otherUser];
+
+    await component.updateEmail(otherUser);
+
+    expect(adminService.updateEmail).toHaveBeenCalledWith('u-2', 'nuevo@koinu.local');
+    expect(component.users[0]).toEqual(updated);
+    expect(component.rowMsg.get('u-2')).toBe('Correo actualizado.');
+  });
+
+  it('resetPassword valida la longitud mínima', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('corta1');
+
+    await component.resetPassword(otherUser);
+
+    expect(adminService.resetPassword).not.toHaveBeenCalled();
+    expect(component.rowMsg.get('u-2')).toContain('al menos 8 caracteres');
+  });
+
+  it('resetPassword llama al servicio con la nueva contraseña', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('NuevaContrasena123');
+    adminService.resetPassword.mockResolvedValue(undefined);
+
+    await component.resetPassword(otherUser);
+
+    expect(adminService.resetPassword).toHaveBeenCalledWith('u-2', 'NuevaContrasena123');
+    expect(component.rowMsg.get('u-2')).toContain('Contraseña restablecida');
   });
 });

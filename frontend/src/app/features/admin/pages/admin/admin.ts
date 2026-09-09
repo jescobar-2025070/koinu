@@ -27,6 +27,12 @@ export class Admin implements OnInit {
   loading = true;
   health: SystemHealth | null = null;
 
+  newUserEmail = '';
+  newUserPassword = '';
+  newUserAdmin = false;
+  creatingUser = false;
+  createMsg = '';
+
   ngOnInit(): void {
     this.sidebarService.setDashboard();
     this.loadData();
@@ -112,6 +118,67 @@ export class Admin implements OnInit {
       this.rolesModel.delete(u.id);
     } catch (e: any) {
       this.rowMsg.set(u.id, e?.error?.error?.message || 'No se pudo eliminar la cuenta.');
+    } finally {
+      this.setBusy(u.id, false);
+      this.cdr.markForCheck();
+    }
+  }
+
+  async createUser(): Promise<void> {
+    const email = this.newUserEmail.trim();
+    if (!email || !this.newUserPassword) {
+      this.createMsg = 'Indica correo y contraseña para crear el usuario.';
+      return;
+    }
+    this.creatingUser = true;
+    this.createMsg = '';
+    try {
+      const roles = this.newUserAdmin ? ['ADMIN', 'USR'] : ['USR'];
+      const created = await this.adminService.createUser(email, this.newUserPassword, roles);
+      this.users = [created, ...this.users];
+      this.rolesModel.set(created.id, { ADMIN: created.roles.includes('ADMIN'), USR: created.roles.includes('USR') });
+      this.newUserEmail = '';
+      this.newUserPassword = '';
+      this.newUserAdmin = false;
+      this.createMsg = 'Usuario creado.';
+    } catch (e: any) {
+      this.createMsg = e?.error?.error?.message || 'No se pudo crear el usuario.';
+    } finally {
+      this.creatingUser = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async updateEmail(u: User): Promise<void> {
+    const next = window.prompt('Nuevo correo electrónico:', u.email);
+    if (!next || !next.trim() || next.trim() === u.email) {
+      return;
+    }
+    this.setBusy(u.id, true);
+    try {
+      const updated = await this.adminService.updateEmail(u.id, next.trim());
+      this.replaceUser(updated);
+      this.rowMsg.set(u.id, 'Correo actualizado.');
+    } catch (e: any) {
+      this.rowMsg.set(u.id, e?.error?.error?.message || 'No se pudo actualizar el correo.');
+    } finally {
+      this.setBusy(u.id, false);
+      this.cdr.markForCheck();
+    }
+  }
+
+  async resetPassword(u: User): Promise<void> {
+    const next = window.prompt(`Nueva contraseña para ${u.email}:`);
+    if (!next || next.length < 8) {
+      this.rowMsg.set(u.id, 'La contraseña debe tener al menos 8 caracteres, una letra y un número.');
+      return;
+    }
+    this.setBusy(u.id, true);
+    try {
+      await this.adminService.resetPassword(u.id, next);
+      this.rowMsg.set(u.id, 'Contraseña restablecida. La sesión del usuario fue cerrada.');
+    } catch (e: any) {
+      this.rowMsg.set(u.id, e?.error?.error?.message || 'No se pudo restablecer la contraseña.');
     } finally {
       this.setBusy(u.id, false);
       this.cdr.markForCheck();
