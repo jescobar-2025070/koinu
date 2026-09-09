@@ -316,6 +316,18 @@ Tras ejecutar `pnpm seed:full`:
 
 - [ ] (_a desarrollar_) Pruebas E2E y casos restantes del frontend.
 
+## Desviaciones y decisiones documentadas
+
+Debido a decisiones aprobadas por el usuario durante la Fase 6, la implementación se desvía deliberadamente de la documentación de diseño original (`DISEÑO_DEL_SISTEMA.txt`, `ANÁLISIS_DEL_SISTEMA.txt`, `Planificación del Proyecto.pdf`) en los siguientes puntos:
+
+| Tema | Documentación de diseño | Implementación actual |
+| --- | --- | --- |
+| Nomenclatura de dominio y API | Nombres en inglés (`movements`, `periods`, `goals`, `/income-categories`, ...) | Nombres en **español** en persistencia, controladores, servicios y validadores (`movimientos`, `periodos`, `objetivos`); API `/objectives` (no `/goals`) y `/categories/income` / `/categories/expense` (no `/income-categories` / `/expense-categories`). |
+| Ciclo de vida de períodos | Períodos se crean en `DRAFT` y se activan después (`DRAFT → ACTIVE → FINISHED/CANCELLED`) | Los estados existen en BD (migración 005), pero al crear un período por API se genera **directamente en `ACTIVE`** (decisión M1). El endpoint `POST /periods/:id/activate` queda casi sin uso y no se gestiona `DRAFT` en la UI. |
+| Presupuesto total | Total definible por el usuario | El total del presupuesto **se calcula automáticamente como los ingresos netos del período** (no editable); solo se asignan porciones del total a categorías de gasto (decisión A4). |
+
+> Estas decisiones no son errores pendientes: fueron aprobadas explícitamente. El seguimiento de bloques de la rama `phase-4` (completados y pendientes) vive en `PENDIENTES_PHASE4.md`.
+
 ## API
 
 Base: `http://localhost:3000/api/v1`
@@ -351,7 +363,7 @@ Base: `http://localhost:3000/api/v1`
 | `POST` | `/periods/:id/cancel` | Sí | Cancelar período (→ CANCELLED) |
 | `GET` | `/periods/:id/dashboard` | Sí | Dashboard del período (disponible por ingresos y por presupuesto) |
 
-> Estados de período: `DRAFT` → `ACTIVE` → `FINISHED` (o `CANCELLED`). Solo se puede registrar movimientos en un período `ACTIVE`, y existe máximo un `ACTIVE` por usuario.
+> Estados de período: `DRAFT` → `ACTIVE` → `FINISHED` (o `CANCELLED`). Solo se puede registrar movimientos en un período `ACTIVE`, y existe máximo un `ACTIVE` por usuario. Nota (desviación documentada): al crear un período se genera **directamente en `ACTIVE`**, no en `DRAFT`; ver la sección "Desviaciones y decisiones documentadas".
 
 ### Presupuestos
 

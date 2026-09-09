@@ -27,6 +27,7 @@ Actualizado: 2026-09-09.
 | A7 | `509eaa6` | Trazabilidad (auditoría) de movimientos y su UI en reportes. |
 | M2 | `7e3ddbf` | Validación de duplicados de categorías (unique case-insensitive por usuario) y guard idempotente en `createDefaultsForUser`. |
 | M3 | *(próximo commit)* | Origen del excedente: `getOverruns` y dashboard exponen el movimiento que generó cada excedente. |
+| M5 | *(próximo commit)* | Documentación de desviaciones (nomenclatura ES/EN, ACTIVE directo, presupuesto automático) en README y bitácora `ERRORES_Y_SOLUCIONES.md`. |
 
 Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `pnpm build` + `pnpm ng test --watch=false` (frontend).
 
@@ -52,7 +53,7 @@ Los siguientes bloques quedaron acordados en sesión pero **aún no se implement
 | M2 | completado | Duplicados de categorías validados (409 `CATEGORY_ALREADY_EXISTS`) y defaults idempotentes. |
 | M3 | completado | Excedentes con el movimiento que los originó en `getOverruns` y dashboard. |
 | M4 | pendiente | Requerimientos por transcribir al retomar (evaluación de alcance del vínculo movimientos↔objetivos). |
-| M5 | pendiente | Requerimientos por transcribir al retomar. |
+| M5 | completado | Desviaciones documentadas en README y `ERRORES_Y_SOLUCIONES.md` (ES/EN, ACTIVE directo, presupuesto automático). |
 | M5 | pendiente | Requerimientos por transcribir al retomar. |
 | M6 | pendiente | Requerimientos por transcribir al retomar. |
 | B1 | pendiente | Requerimientos por transcribir al retomar. |
@@ -71,7 +72,7 @@ Alcance MVP aún cubierta parcialmente y candidata a asignarse a esos bloques (s
 ## 5. Retomar el trabajo
 
 1. Verificar estado actual: `git -C koinu status` y `git -C koinu log --oneline origin/phase-4..HEAD`.
-2. Obtener del usuario el detalle del siguiente bloque (M4, M5, M6 o B*).
+2. Obtener del usuario el detalle del siguiente bloque (M4, M6 o B*).
 3. Implementar bloque por bloque, con verificación (typecheck/test/build) y commit por bloque, en inglés.
 4. Actualizar este documento al cerrar cada bloque.
 5. Push a `origin/phase-4` cuando el usuario lo indique.
