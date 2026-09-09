@@ -31,6 +31,7 @@ Actualizado: 2026-09-09.
 | M5 | `81ba444` | Documentación de desviaciones (nomenclatura ES/EN, ACTIVE directo, presupuesto automático) en README y bitácora `ERRORES_Y_SOLUCIONES.md`. |
 | M6 | `7116f4d` | Higiene: DTOs de respuesta estandarizados (dashboard y overruns envueltos en clave) e invariantes con `ErrorCodes`. |
 | B1 | `4b6fdfa` | Documentación en README (sección API) de la nomenclatura de endpoints (español/camelCase, mapeo EN→ES) y de las respuestas envueltas en clave de recurso. |
+| B2 | *(pendiente de commit)* | Notas documentales DRAFT sobre código inerte detectado en el sistema actual, en `NOTAS_CODIGO_INERTE.md` (rama DRAFT de períodos/M1, `RoleResponse` sin usar, endpoints y métodos frontend sin consumidor, scripts de mantenimiento). Bajo riesgo: documentación únicamente, sin cambios de funcionamiento. |
 
 Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `pnpm build` + `pnpm ng test --watch=false` (frontend).
 
@@ -58,7 +59,7 @@ Los siguientes bloques quedaron acordados en sesión pero **aún no se implement
 |--------|--------|-------|
 | M4 | completado | Vínculo movimientos↔objetivos con aporte automático (ver §2 y §3). |
 | B1 | completado | Nomenclatura de endpoints y respuestas documentada en README (sección API). |
-| B2 | pendiente | Requerimientos por transcribir al retomar. |
+| B2 | completado | Notas documentales DRAFT sobre código inerte detectado, en `NOTAS_CODIGO_INERTE.md` (ver §2 y §3). |
 | B3 | pendiente | Requerimientos por transcribir al retomar. |
 | B4 | pendiente | Requerimientos por transcribir al retomar. |
 | B5 | pendiente | Requerimientos por transcribir al retomar. |
