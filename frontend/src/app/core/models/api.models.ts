@@ -145,6 +145,7 @@ export interface ReportCategoryRow {
   nombre: string;
   tipo: MovimientoType;
   total: number;
+  presupuestado: number | null;
 }
 
 export interface ReportData {
@@ -173,6 +174,7 @@ export interface ReportData {
     progress: number;
     status: string;
   }[];
+  recomendaciones: string[];
   generadoEn: string;
 }
 

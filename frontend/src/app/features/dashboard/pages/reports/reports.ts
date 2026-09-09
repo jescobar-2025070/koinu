@@ -3,7 +3,14 @@ import { SidebarService } from '../../../../core/services/sidebar.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
-import { Movimiento, Categoria, MovimientoStats } from '../../../../core/models/api.models';
+import { ReportService } from '../../../../core/services/report.service';
+import {
+  Categoria,
+  Movimiento,
+  Periodo,
+  ReportCategoryRow,
+  ReportData,
+} from '../../../../core/models/api.models';
 
 @Component({
   selector: 'app-dashboard-reports',
@@ -15,14 +22,17 @@ export class DashboardReports implements OnInit {
   private readonly movimientoService = inject(MovimientoService);
   private readonly periodoService = inject(PeriodoService);
   private readonly categoriaService = inject(CategoriaService);
+  private readonly reportService = inject(ReportService);
   private readonly cdr = inject(ChangeDetectorRef);
 
+  periodos: Periodo[] = [];
+  selectedPeriodId: string | undefined;
   activePeriodName = '—';
-  stats: MovimientoStats = { totalIngresos: 0, totalGastos: 0 };
-  available = 0;
+  report: ReportData | null = null;
+  reportType: 'PRELIMINAR' | 'FINAL' = 'PRELIMINAR';
+  generadoEn = '';
   movements: Movimiento[] = [];
   private categories: Categoria[] = [];
-  private activePeriodId: string | undefined;
 
   ngOnInit(): void {
     this.sidebarService.setDashboard();
@@ -32,23 +42,119 @@ export class DashboardReports implements OnInit {
   private async loadData(): Promise<void> {
     try {
       const periodos = await this.periodoService.list();
+      this.periodos = periodos;
       const activePeriod = periodos.find((p) => p.status === 'ACTIVE');
-      this.activePeriodId = activePeriod?.id;
-      this.activePeriodName = activePeriod?.name ?? '—';
+      this.selectedPeriodId = activePeriod?.id ?? periodos[0]?.id;
+      await this.loadSelected();
+    } catch (e) {
+      console.error('Error loading reports:', e);
+    }
+  }
 
-      const [stats, movimientos, ingresos, gastos] = await Promise.all([
-        this.movimientoService.stats(this.activePeriodId),
-        this.movimientoService.list(this.activePeriodId),
+  async onPeriodChange(event: Event): Promise<void> {
+    const id = (event.target as HTMLSelectElement).value;
+    if (!id) {
+      return;
+    }
+    this.selectedPeriodId = id;
+    await this.loadSelected();
+  }
+
+  private async loadSelected(): Promise<void> {
+    if (!this.selectedPeriodId) {
+      this.report = null;
+      this.movements = [];
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const periodo = this.periodos.find((p) => p.id === this.selectedPeriodId);
+    this.activePeriodName = periodo?.name ?? '—';
+
+    try {
+      let report: ReportData;
+      let generadoEn = '';
+      if (periodo?.status === 'FINISHED') {
+        this.reportType = 'FINAL';
+        const historico = await this.reportService.getFinal(this.selectedPeriodId);
+        report = historico.report;
+        generadoEn = historico.generadoEn;
+      } else {
+        this.reportType = 'PRELIMINAR';
+        report = await this.reportService.getPreliminary(this.selectedPeriodId);
+        generadoEn = report.generadoEn;
+      }
+      this.report = report;
+      this.generadoEn = generadoEn;
+    } catch (e) {
+      try {
+        this.reportType = 'PRELIMINAR';
+        this.report = await this.reportService.getPreliminary(this.selectedPeriodId);
+        this.generadoEn = this.report.generadoEn;
+      } catch (e2) {
+        console.error('Error loading report:', e);
+        this.report = null;
+        this.generadoEn = '';
+      }
+    }
+
+    try {
+      const [movimientos, ingresos, gastos] = await Promise.all([
+        this.movimientoService.list(this.selectedPeriodId),
         this.categoriaService.listIncome(),
         this.categoriaService.listExpense(),
       ]);
-      this.stats = stats;
-      this.available = stats.totalIngresos - stats.totalGastos;
       this.categories = [...ingresos, ...gastos];
       this.movements = movimientos;
-      this.cdr.markForCheck();
     } catch (e) {
-      console.error('Error loading reports:', e);
+      console.error('Error loading movements:', e);
+    }
+    this.cdr.markForCheck();
+  }
+
+  get presupuestoTotal(): number {
+    return this.report?.presupuesto?.total ?? 0;
+  }
+
+  get presupuestoAsignado(): number {
+    return this.report?.presupuesto?.asignado ?? 0;
+  }
+
+  get presupuestoExcedente(): number {
+    return this.report?.presupuesto?.excedente ?? 0;
+  }
+
+  get expenseRows(): ReportCategoryRow[] {
+    return this.report?.porCategoria.filter((r) => r.tipo === 'EXPENSE') ?? [];
+  }
+
+  get recomendaciones(): string[] {
+    return this.report?.recomendaciones ?? [];
+  }
+
+  get objetivos(): ReportData['objetivos'] {
+    return this.report?.objetivos ?? [];
+  }
+
+  deviationAmount(row: ReportCategoryRow): number | null {
+    if (row.presupuestado === null) {
+      return null;
+    }
+    return row.total - row.presupuestado;
+  }
+
+  progressWidth(progress: number): number {
+    return Math.min(100, progress);
+  }
+
+  objetivoStatusLabel(status: string): string {
+    switch (status) {
+      case 'COMPLETED':
+        return 'COMPLETADO';
+      case 'CANCELLED':
+        return 'CANCELADO';
+      default:
+        return 'ACTIVO';
     }
   }
 

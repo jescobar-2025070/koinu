@@ -1,62 +1,173 @@
 <div class="reports-view">
-  <div class="section-title">INFORMES</div>
-
-  <div class="summary-cards">
-    <div class="summary-card">
-      <div class="summary-label">PERÍODO</div>
-      <div class="summary-value">{{ activePeriodName }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">INGRESOS</div>
-      <div class="summary-value summary-value--income">{{ formatCurrency(stats.totalIngresos) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">GASTOS</div>
-      <div class="summary-value summary-value--expense">{{ formatCurrency(stats.totalGastos) }}</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">DISPONIBLE</div>
-      <div class="summary-value">{{ formatCurrency(available) }}</div>
-    </div>
+  <div class="reports-header">
+    <div class="section-title">INFORMES</div>
+    @if (periodos.length > 0) {
+      <label class="period-select-wrap">
+        <span class="period-select-label">PERÍODO</span>
+        <select class="period-select" [value]="selectedPeriodId" (change)="onPeriodChange($event)">
+          @for (periodo of periodos; track periodo.id) {
+            <option [value]="periodo.id">{{ periodo.name }}</option>
+          }
+        </select>
+      </label>
+    }
+    @if (report) {
+      <span class="report-type-badge" [class.report-type-badge--final]="reportType === 'FINAL'">
+        INFORME {{ reportType }}
+      </span>
+    }
   </div>
 
-  <div class="reports-toolbar">
-    <button class="report-action" (click)="exportCsv()" [disabled]="movements.length === 0">
-      <span class="material-symbols-outlined" style="font-size:14px;">download</span>
-      Exportar CSV
-    </button>
-  </div>
+  @if (!report) {
+    <div class="empty-state">
+      @if (periodos.length === 0) {
+        <p>No hay períodos. Crea un período para generar un informe.</p>
+      } @else {
+        <p>No se pudo generar el informe para este período.</p>
+      }
+    </div>
+  } @else {
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="summary-label">PERÍODO</div>
+        <div class="summary-value">{{ activePeriodName }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">INGRESOS</div>
+        <div class="summary-value summary-value--income">{{ formatCurrency(report.totalIngresos) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">GASTOS</div>
+        <div class="summary-value summary-value--expense">{{ formatCurrency(report.totalGastos) }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">DISPONIBLE</div>
+        <div class="summary-value">{{ formatCurrency(report.disponible) }}</div>
+      </div>
+      @if (report.presupuesto) {
+        <div class="summary-card">
+          <div class="summary-label">PRESUPUESTO TOTAL</div>
+          <div class="summary-value">{{ formatCurrency(presupuestoTotal) }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">ASIGNADO</div>
+          <div class="summary-value">{{ formatCurrency(presupuestoAsignado) }}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">EXCEDENTE</div>
+          <div class="summary-value" [class.summary-value--expense]="presupuestoExcedente > 0">
+            {{ formatCurrency(presupuestoExcedente) }}
+          </div>
+        </div>
+      }
+    </div>
 
-  <div class="table-wrap scroll-y">
-    <table>
-      <thead>
-        <tr>
-          <th><span class="th-pill">FECHA</span></th>
-          <th><span class="th-pill">TIPO</span></th>
-          <th><span class="th-pill">CATEGORÍA</span></th>
-          <th><span class="th-pill">DESCRIPCIÓN</span></th>
-          <th><span class="th-pill">MONTO</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (movement of movements; track movement.id) {
-          <tr>
-            <td>{{ formatDate(movement.date) }}</td>
-            <td [style.color]="movement.type === 'EXPENSE' ? '#ff8080' : 'var(--green)'">
-              {{ movement.type === 'INCOME' ? 'Ingreso' : 'Gasto' }}
-            </td>
-            <td>{{ getCategoryName(movement.type === 'INCOME' ? movement.incomeCategoryId : movement.expenseCategoryId) }}</td>
-            <td class="wrap">{{ movement.description ?? '—' }}</td>
-            <td class="right">{{ formatCurrency(movement.amount) }}</td>
-          </tr>
-        } @empty {
-          <tr>
-            <td colspan="5" style="text-align:center; color:rgba(255,255,255,0.5);">
-              No hay movimientos en el período activo
-            </td>
-          </tr>
+    @if (generadoEn) {
+      <div class="report-meta">
+        {{ reportType === 'FINAL' ? 'Informe final' : 'Informe preliminar' }} generado el {{ formatDate(generadoEn) }}
+        @if (reportType === 'FINAL') {
+          <span class="report-meta-note"> — copia histórica del período</span>
         }
-      </tbody>
-    </table>
-  </div>
+      </div>
+    }
+
+    @if (expenseRows.length > 0) {
+      <div class="section-subtitle">DESVIACIONES POR CATEGORÍA</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><span class="th-pill">CATEGORÍA</span></th>
+              <th><span class="th-pill">PRESUPUESTADO</span></th>
+              <th><span class="th-pill">GASTADO</span></th>
+              <th><span class="th-pill">DESVIACIÓN</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of expenseRows; track row.categoriaId) {
+              <tr>
+                <td>{{ row.nombre }}</td>
+                <td class="right">{{ row.presupuestado !== null ? formatCurrency(row.presupuestado) : '—' }}</td>
+                <td class="right">{{ formatCurrency(row.total) }}</td>
+                <td class="right" [style.color]="deviationAmount(row) !== null && deviationAmount(row)! > 0 ? '#ff8080' : 'var(--green)'">
+                  {{ deviationAmount(row) !== null ? formatCurrency(deviationAmount(row)!) : '—' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (objetivos.length > 0) {
+      <div class="section-subtitle">OBJETIVOS FINANCIEROS</div>
+      <div class="objetivos-grid">
+        @for (objetivo of objetivos; track objetivo.id) {
+          <div class="objetivo-card">
+            <div class="objetivo-top">
+              <span class="objetivo-name">{{ objetivo.name }}</span>
+              <span class="objetivo-status">{{ objetivoStatusLabel(objetivo.status) }}</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" [style.width.%]="progressWidth(objetivo.progress)"></div>
+            </div>
+            <div class="objetivo-bottom">
+              <span>{{ formatCurrency(objetivo.currentAmount) }} / {{ formatCurrency(objetivo.targetAmount) }}</span>
+              <span>{{ objetivo.progress }}%</span>
+            </div>
+          </div>
+        }
+      </div>
+      <div class="report-meta">Progreso calculado automáticamente por el sistema.</div>
+    }
+
+    @if (recomendaciones.length > 0) {
+      <div class="section-subtitle">RECOMENDACIONES</div>
+      <ul class="recomendaciones-list">
+        @for (recomendacion of recomendaciones; track $index) {
+          <li>{{ recomendacion }}</li>
+        }
+      </ul>
+    }
+
+    <div class="section-subtitle">MOVIMIENTOS DEL PERÍODO</div>
+    <div class="reports-toolbar">
+      <button class="report-action" (click)="exportCsv()" [disabled]="movements.length === 0">
+        <span class="material-symbols-outlined" style="font-size:14px;">download</span>
+        Exportar CSV
+      </button>
+    </div>
+    <div class="table-wrap scroll-y">
+      <table>
+        <thead>
+          <tr>
+            <th><span class="th-pill">FECHA</span></th>
+            <th><span class="th-pill">TIPO</span></th>
+            <th><span class="th-pill">CATEGORÍA</span></th>
+            <th><span class="th-pill">DESCRIPCIÓN</span></th>
+            <th><span class="th-pill">MONTO</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (movement of movements; track movement.id) {
+            <tr>
+              <td>{{ formatDate(movement.date) }}</td>
+              <td [style.color]="movement.type === 'EXPENSE' ? '#ff8080' : 'var(--green)'">
+                {{ movement.type === 'INCOME' ? 'Ingreso' : 'Gasto' }}
+              </td>
+              <td>{{ getCategoryName(movement.type === 'INCOME' ? movement.incomeCategoryId : movement.expenseCategoryId) }}</td>
+              <td class="wrap">{{ movement.description ?? '—' }}</td>
+              <td class="right">{{ formatCurrency(movement.amount) }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" style="text-align:center; color:rgba(255,255,255,0.5);">
+                No hay movimientos en el período seleccionado
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 </div>

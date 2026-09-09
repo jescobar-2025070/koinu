@@ -17,6 +17,7 @@ export interface ReportCategoryRow {
   nombre: string;
   tipo: MovimientoType;
   total: number;
+  presupuestado: number | null;
 }
 
 export interface ReportData {
@@ -45,6 +46,7 @@ export interface ReportData {
     progress: number;
     status: string;
   }[];
+  recomendaciones: string[];
   generadoEn: Date;
 }
 
@@ -133,22 +135,19 @@ export class ReportService {
     const totalGastos = Number(stats.totalGastos);
     const disponible = totalIngresos - totalGastos;
 
-    const porCategoria: ReportCategoryRow[] = (
-      await movimientoRepo.getCategoryBreakdown(periodo.id)
-    ).map((row) => ({
-      categoriaId: row.categoryId,
-      nombre: row.nombre,
-      tipo: row.type,
-      total: row.total,
-    }));
+    const porCategoriaBase = await movimientoRepo.getCategoryBreakdown(periodo.id);
 
     const presupuesto = await presupuestoRepo.findByPeriodo(periodo.id);
     let presupuestoInfo: ReportData['presupuesto'] = null;
     let excedente = 0;
+    const asignacionPorCategoria: Record<string, number> = {};
     if (presupuesto) {
       const asignaciones = await asignacionRepo.findByPresupuesto(presupuesto.id);
       const asignado = asignaciones.reduce((s, a) => s + Number(a.amount), 0);
       excedente = await excedenteRepo.findTotalByPresupuesto(presupuesto.id);
+      for (const asignacion of asignaciones) {
+        asignacionPorCategoria[asignacion.categoriaGastoId] = Number(asignacion.amount);
+      }
       presupuestoInfo = {
         total: totalIngresos,
         asignado,
@@ -156,6 +155,17 @@ export class ReportService {
         excedente: Number(excedente),
       };
     }
+
+    const porCategoria: ReportCategoryRow[] = porCategoriaBase.map((row) => ({
+      categoriaId: row.categoryId,
+      nombre: row.nombre,
+      tipo: row.type,
+      total: row.total,
+      presupuestado:
+        row.type === 'EXPENSE' && row.categoryId !== null
+          ? (asignacionPorCategoria[row.categoryId] ?? null)
+          : null,
+    }));
 
     const objetivos = await objetivoRepo.findForReport(userId, periodo.id);
     const objetivosInfo = objetivos.map((o: Objetivo) => ({
@@ -166,6 +176,13 @@ export class ReportService {
       progress: o.targetAmount > 0 ? Math.round((o.currentAmount / o.targetAmount) * 100) : 0,
       status: o.status,
     }));
+
+    const recomendaciones = this.buildRecomendaciones({
+      presupuesto: presupuestoInfo,
+      excedente,
+      disponible,
+      objetivos: objetivosInfo,
+    });
 
     return {
       periodo: {
@@ -181,7 +198,45 @@ export class ReportService {
       presupuesto: presupuestoInfo,
       porCategoria,
       objetivos: objetivosInfo,
+      recomendaciones,
       generadoEn: new Date(),
     };
+  }
+
+  private buildRecomendaciones(params: {
+    presupuesto: ReportData['presupuesto'];
+    excedente: number;
+    disponible: number;
+    objetivos: ReportData['objetivos'];
+  }): string[] {
+    const recomendaciones: string[] = [];
+    const fmt = (n: number): string =>
+      'Q' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (params.presupuesto) {
+      if (params.excedente > 0) {
+        recomendaciones.push(
+          `Tus gastos superaron tu presupuesto por ${fmt(params.excedente)}. Revisa las categorías de gasto y ajusta tu presupuesto.`,
+        );
+      } else {
+        recomendaciones.push(
+          'Te mantienes dentro de tu presupuesto general. Sigue registrando tus gastos para mantener el control.',
+        );
+      }
+    } else {
+      recomendaciones.push(
+        'Aún no has definido un presupuesto para este período. Defínelo para fijar un límite general de gasto.',
+      );
+    }
+
+    const objetivosPendientes = params.objetivos.filter((o) => o.progress < 100);
+    if (params.disponible > 0 && objetivosPendientes.length > 0) {
+      recomendaciones.push('Considera apartar una parte de tu ingreso disponible para tus objetivos.');
+    }
+    if (params.objetivos.some((o) => o.progress >= 100)) {
+      recomendaciones.push('Alcanzaste la meta de al menos un objetivo. ¡Buen manejo de tus finanzas personales!');
+    }
+
+    return recomendaciones;
   }
 }
