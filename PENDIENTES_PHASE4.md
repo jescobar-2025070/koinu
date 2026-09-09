@@ -26,9 +26,10 @@ Actualizado: 2026-09-09.
 | A6 | `42c9581` | Clasificación de movimientos y prioridad de objetivos. |
 | A7 | `509eaa6` | Trazabilidad (auditoría) de movimientos y su UI en reportes. |
 | M2 | `7e3ddbf` | Validación de duplicados de categorías (unique case-insensitive por usuario) y guard idempotente en `createDefaultsForUser`. |
-| M3 | *(próximo commit)* | Origen del excedente: `getOverruns` y dashboard exponen el movimiento que generó cada excedente. |
-| M5 | *(próximo commit)* | Documentación de desviaciones (nomenclatura ES/EN, ACTIVE directo, presupuesto automático) en README y bitácora `ERRORES_Y_SOLUCIONES.md`. |
-| M6 | *(próximo commit)* | Higiene: DTOs de respuesta estandarizados (dashboard y overruns envueltos en clave) e invariantes con `ErrorCodes`. |
+| M3 | `0f7308a` | Origen del excedente: `getOverruns` y dashboard exponen el movimiento que generó cada excedente. |
+| M5 | `81ba444` | Documentación de desviaciones (nomenclatura ES/EN, ACTIVE directo, presupuesto automático) en README y bitácora `ERRORES_Y_SOLUCIONES.md`. |
+| M6 | `7116f4d` | Higiene: DTOs de respuesta estandarizados (dashboard y overruns envueltos en clave) e invariantes con `ErrorCodes`. |
+| B1 | `4b6fdfa` | Documentación en README (sección API) de la nomenclatura de endpoints (español/camelCase, mapeo EN→ES) y de las respuestas envueltas en clave de recurso. |
 
 Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `pnpm build` + `pnpm ng test --watch=false` (frontend).
 
@@ -53,14 +54,8 @@ Los siguientes bloques quedaron acordados en sesión pero **aún no se implement
 
 | Bloque | Estado | Notas |
 |--------|--------|-------|
-| M2 | completado | Duplicados de categorías validados (409 `CATEGORY_ALREADY_EXISTS`) y defaults idempotentes. |
-| M3 | completado | Excedentes con el movimiento que los originó en `getOverruns` y dashboard. |
 | M4 | pendiente | Requerimientos por transcribir al retomar (evaluación de alcance del vínculo movimientos↔objetivos). |
-| M5 | completado | Desviaciones documentadas en README y `ERRORES_Y_SOLUCIONES.md` (ES/EN, ACTIVE directo, presupuesto automático). |
-| M6 | completado | DTOs de dashboard y overruns envueltos (`{ dashboard }`, `{ overruns }`) y errores de `detalle-ingreso` via `AppError(VALIDATION_ERROR)`. |
-| M5 | pendiente | Requerimientos por transcribir al retomar. |
-| M6 | pendiente | Requerimientos por transcribir al retomar. |
-| B1 | pendiente | Requerimientos por transcribir al retomar. |
+| B1 | completado | Nomenclatura de endpoints y respuestas documentada en README (sección API). |
 | B2 | pendiente | Requerimientos por transcribir al retomar. |
 | B3 | pendiente | Requerimientos por transcribir al retomar. |
 | B4 | pendiente | Requerimientos por transcribir al retomar. |
