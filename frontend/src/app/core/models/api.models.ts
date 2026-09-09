@@ -17,6 +17,8 @@ export interface AdminPeriod extends Periodo {
 }
 
 export type MovimientoType = 'INCOME' | 'EXPENSE';
+export type IncomeClassification = 'REGULAR' | 'OCASIONAL';
+export type ExpenseType = 'FIJO' | 'VARIABLE';
 
 export interface Movimiento {
   id: string;
@@ -27,6 +29,8 @@ export interface Movimiento {
   expenseCategoryId: string | null;
   amount: number;
   description: string | null;
+  incomeClassification: IncomeClassification | null;
+  expenseType: ExpenseType | null;
   date: string;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +55,7 @@ export interface Categoria {
 }
 
 export type ObjetivoStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type ObjetivoPriority = 'ALTA' | 'MEDIA' | 'BAJA';
 
 export interface Objetivo {
   id: string;
@@ -62,6 +67,7 @@ export interface Objetivo {
   currentAmount: number;
   deadline: string | null;
   startDate: string | null;
+  priority: ObjetivoPriority;
   status: ObjetivoStatus;
   createdAt: string;
   updatedAt: string;

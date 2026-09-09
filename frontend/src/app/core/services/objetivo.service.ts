@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
-import { Objetivo } from '../models/api.models';
+import { Objetivo, ObjetivoPriority } from '../models/api.models';
 
 export interface CrearObjetivo {
   periodoId?: string;
@@ -10,6 +10,7 @@ export interface CrearObjetivo {
   targetAmount: number;
   deadline?: string;
   startDate?: string;
+  priority?: ObjetivoPriority;
 }
 
 export interface ActualizarObjetivo {
@@ -19,6 +20,7 @@ export interface ActualizarObjetivo {
   deadline?: string | null;
   startDate?: string | null;
   periodoId?: string | null;
+  priority?: ObjetivoPriority;
 }
 
 @Injectable({ providedIn: 'root' })

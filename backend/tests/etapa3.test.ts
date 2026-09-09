@@ -195,6 +195,7 @@ describe('Etapa 3 - Ingresos con tratamiento fiscal', () => {
     const res = await agent.post('/api/v1/movements').send({
       periodId: periodo.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 2000,
       retentionAmount: 100,
@@ -219,6 +220,7 @@ describe('Etapa 3 - Ingresos con tratamiento fiscal', () => {
     const res = await agent.post('/api/v1/movements').send({
       periodId: periodo.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 1000,
       retentionAmount: 1500,
@@ -238,6 +240,7 @@ describe('Etapa 3 - Ingresos con tratamiento fiscal', () => {
     const res = await agent.post('/api/v1/movements').send({
       periodId: periodo.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 1000,
       retentionAmount: 0,
@@ -265,6 +268,7 @@ describe('Etapa 3 - Ingresos con tratamiento fiscal', () => {
     const res = await agent.post('/api/v1/movements').send({
       periodId: p.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 1000,
       retentionAmount: 0,
@@ -294,6 +298,7 @@ describe('Etapa 3 - Dashboard', () => {
     await agent.post('/api/v1/movements').send({
       periodId: p.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 2000,
       retentionAmount: 100,

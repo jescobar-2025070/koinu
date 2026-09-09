@@ -53,6 +53,7 @@ describe('Reportes y snapshots (C1)', () => {
     const ingreso = await agent.post('/api/v1/movements').send({
       periodId: p1.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 2000,
       retentionAmount: 100,

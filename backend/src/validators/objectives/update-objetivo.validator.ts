@@ -1,4 +1,5 @@
 import { ValidationResult, validationFailure, validationSuccess } from '../validator-result';
+import { ObjetivoPriority } from '../../entities/objetivo.entity';
 
 export interface UpdateObjetivoRequest {
   name?: string;
@@ -7,7 +8,10 @@ export interface UpdateObjetivoRequest {
   deadline?: string | null;
   startDate?: string | null;
   periodoId?: string | null;
+  priority?: ObjetivoPriority;
 }
+
+const VALID_PRIORITIES: ObjetivoPriority[] = ['ALTA', 'MEDIA', 'BAJA'];
 
 export function validateUpdateObjetivoRequest(body: unknown): ValidationResult<UpdateObjetivoRequest> {
   const errors: Record<string, string> = {};
@@ -84,6 +88,21 @@ export function validateUpdateObjetivoRequest(body: unknown): ValidationResult<U
       result.periodoId = data.periodoId.trim();
     } else {
       errors.periodoId = 'El identificador del período no es válido.';
+    }
+  }
+
+  if (data.priority !== undefined) {
+    if (data.priority === null || data.priority === '') {
+      errors.priority = 'La prioridad debe ser ALTA, MEDIA o BAJA.';
+    } else {
+      const priority = typeof data.priority === 'string'
+        ? data.priority.trim().toUpperCase() as ObjetivoPriority
+        : undefined;
+      if (priority === undefined || !VALID_PRIORITIES.includes(priority)) {
+        errors.priority = 'La prioridad debe ser ALTA, MEDIA o BAJA.';
+      } else {
+        result.priority = priority;
+      }
     }
   }
 

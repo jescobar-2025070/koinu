@@ -173,6 +173,26 @@
   color: #ff8a80;
 }
 
+.priority-pill {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: 50px;
+  background: rgba(255, 196, 0, 0.16);
+  color: #ffd54f;
+}
+
+.priority-media {
+  background: rgba(0, 229, 255, 0.14);
+  color: var(--cyan);
+}
+
+.priority-baja {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .objective-description {
   color: var(--text-dim2);
   font-size: 0.82rem;

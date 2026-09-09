@@ -51,6 +51,7 @@ async function addIncome(agent: request.Agent, periodId: string, grossAmount: nu
   return agent.post('/api/v1/movements').send({
     periodId,
     type: 'INCOME',
+    incomeClassification: 'REGULAR',
     incomeCategoryId: categoriaId,
     grossAmount,
     retentionAmount: 0,
@@ -64,6 +65,7 @@ async function addExpense(agent: request.Agent, periodId: string, amount: number
   const res = await agent.post('/api/v1/movements').send({
     periodId,
     type: 'EXPENSE',
+    expenseType: 'VARIABLE',
     expenseCategoryId: categoriaId,
     amount,
     date: '2027-07-10',

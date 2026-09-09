@@ -5,7 +5,7 @@ import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
 import { TratamientoFiscalService } from '../../../../core/services/tratamiento-fiscal.service';
-import { Periodo, Categoria, TratamientoFiscal } from '../../../../core/models/api.models';
+import { Periodo, Categoria, TratamientoFiscal, IncomeClassification } from '../../../../core/models/api.models';
 import { todayLocalISO } from '../../../../core/utils/date.util';
 
 @Component({
@@ -28,6 +28,7 @@ export class MovementsIncome implements OnInit {
   selectedPeriodoId = '';
   selectedCategoriaId = '';
   selectedTratamientoId = '';
+  selectedClasificacion: IncomeClassification = 'REGULAR';
   monto = 0;
   descripcion = '';
   fecha = todayLocalISO();
@@ -103,6 +104,7 @@ export class MovementsIncome implements OnInit {
         grossAmount: this.monto,
         retentionAmount: this.retencion,
         taxTreatmentId: this.selectedTratamientoId || undefined,
+        incomeClassification: this.selectedClasificacion,
         description: this.descripcion || undefined,
         date: this.fecha || undefined,
       });

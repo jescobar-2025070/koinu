@@ -1,9 +1,11 @@
 import { pool } from '../../config/db';
 import { AppError } from '../../errors/app-error';
 import { ErrorCodes } from '../../errors/error-codes';
-import { Objetivo, ObjetivoStatus } from '../../entities/objetivo.entity';
+import { Objetivo, ObjetivoPriority, ObjetivoStatus } from '../../entities/objetivo.entity';
 import { ObjetivoRepository } from '../../repositories/objetivo.repository';
 import { PeriodoService } from '../periods/periodo.service';
+
+const OBJETIVO_PRIORITIES: ObjetivoPriority[] = ['ALTA', 'MEDIA', 'BAJA'];
 
 export interface CrearObjetivoInput {
   periodoId?: string;
@@ -12,6 +14,7 @@ export interface CrearObjetivoInput {
   targetAmount: number;
   deadline?: string;
   startDate?: string;
+  priority?: ObjetivoPriority;
 }
 
 export class ObjetivoService {
@@ -51,6 +54,14 @@ export class ObjetivoService {
       });
     }
 
+    const priority = this.normalizePriority(data.priority, 'MEDIA');
+    if (data.priority !== undefined && priority === null) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'La prioridad debe ser ALTA, MEDIA o BAJA.',
+        statusCode: 400,
+      });
+    }
+
     if (data.periodoId) {
       await this.periodoService.findById(data.periodoId, userId);
     }
@@ -63,6 +74,7 @@ export class ObjetivoService {
       targetAmount: data.targetAmount,
       deadline: data.deadline ? new Date(data.deadline) : null,
       startDate: data.startDate ? new Date(data.startDate) : new Date(),
+      priority: (priority ?? 'MEDIA') as ObjetivoPriority,
     });
   }
 
@@ -76,6 +88,7 @@ export class ObjetivoService {
       deadline?: string;
       startDate?: string;
       periodoId?: string | null;
+      priority?: ObjetivoPriority;
     },
   ): Promise<Objetivo> {
     await this.assertOwned(id, userId);
@@ -87,6 +100,7 @@ export class ObjetivoService {
       deadline?: Date | null;
       startDate?: Date | null;
       periodoId?: string | null;
+      priority?: ObjetivoPriority;
     } = {};
 
     if (data.name !== undefined) payload.name = data.name.trim();
@@ -107,6 +121,16 @@ export class ObjetivoService {
         await this.periodoService.findById(data.periodoId, userId);
       }
       payload.periodoId = data.periodoId;
+    }
+    if (data.priority !== undefined) {
+      const priority = this.normalizePriority(data.priority, undefined);
+      if (priority === null) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+          message: 'La prioridad debe ser ALTA, MEDIA o BAJA.',
+          statusCode: 400,
+        });
+      }
+      payload.priority = priority;
     }
 
     const updated = await this.objetivoRepository.update(id, payload);
@@ -203,6 +227,16 @@ export class ObjetivoService {
       });
     }
     return updated;
+  }
+
+  private normalizePriority(value: string | undefined, fallback: ObjetivoPriority | undefined): ObjetivoPriority | null {
+    const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (!normalized) {
+      return fallback ?? null;
+    }
+    return OBJETIVO_PRIORITIES.includes(normalized as ObjetivoPriority)
+      ? (normalized as ObjetivoPriority)
+      : null;
   }
 
   private assertActive(objetivo: Objetivo): void {

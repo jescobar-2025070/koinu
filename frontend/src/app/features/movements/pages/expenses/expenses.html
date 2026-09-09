@@ -31,6 +31,13 @@
         </select>
       </div>
       <div class="form-field">
+        <label>TIPO DE GASTO *</label>
+        <select class="glow-pill" [(ngModel)]="selectedTipo">
+          <option value="FIJO">Fijo</option>
+          <option value="VARIABLE">Variable</option>
+        </select>
+      </div>
+      <div class="form-field">
         <label>DESCRIPCIÓN</label>
         <textarea class="glow-pill" rows="2" [(ngModel)]="descripcion"></textarea>
       </div>

@@ -22,6 +22,13 @@
         </select>
       </div>
       <div class="form-field">
+        <label>CLASIFICACIÓN *</label>
+        <select class="glow-pill" [(ngModel)]="selectedClasificacion">
+          <option value="REGULAR">Regular</option>
+          <option value="OCASIONAL">Ocasional</option>
+        </select>
+      </div>
+      <div class="form-field">
         <label>TIPO DE IMPUESTO</label>
         <select class="glow-pill" [(ngModel)]="selectedTratamientoId">
           @for (t of tratamientos; track t.id) {

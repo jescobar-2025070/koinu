@@ -71,6 +71,7 @@ describe('Edición de movimientos (C2)', () => {
     const creado = await agent.post('/api/v1/movements').send({
       periodId: periodo.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 2000,
       retentionAmount: 100,
@@ -104,6 +105,7 @@ describe('Edición de movimientos (C2)', () => {
     const creado = await agent.post('/api/v1/movements').send({
       periodId: periodo.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 1000,
       retentionAmount: 0,
@@ -128,6 +130,7 @@ describe('Edición de movimientos (C2)', () => {
     const creado = await agent.post('/api/v1/movements').send({
       periodId: periodo.id,
       type: 'INCOME',
+      incomeClassification: 'REGULAR',
       incomeCategoryId: categoriaId,
       grossAmount: 3000,
       retentionAmount: 300,

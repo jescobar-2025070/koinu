@@ -4,7 +4,7 @@ import { SidebarService } from '../../../../core/services/sidebar.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
-import { Periodo, Categoria } from '../../../../core/models/api.models';
+import { Periodo, Categoria, ExpenseType } from '../../../../core/models/api.models';
 import { todayLocalISO } from '../../../../core/utils/date.util';
 
 @Component({
@@ -24,6 +24,7 @@ export class MovementsExpenses implements OnInit {
   categorias: Categoria[] = [];
   selectedPeriodoId = '';
   selectedCategoriaId = '';
+  selectedTipo: ExpenseType = 'VARIABLE';
   monto = 0;
   metodo = 'Efectivo';
   descripcion = '';
@@ -79,6 +80,7 @@ export class MovementsExpenses implements OnInit {
         type: 'EXPENSE',
         expenseCategoryId: this.selectedCategoriaId,
         amount: this.monto,
+        expenseType: this.selectedTipo,
         description: this.descripcion || undefined,
         date: this.fecha || undefined,
       });

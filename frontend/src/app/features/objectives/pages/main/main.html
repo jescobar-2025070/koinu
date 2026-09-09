@@ -28,6 +28,14 @@
           </select>
         </div>
         <div class="form-field">
+          <label>PRIORIDAD</label>
+          <select class="glow-pill" [(ngModel)]="formPriority">
+            <option value="ALTA">Alta</option>
+            <option value="MEDIA">Media</option>
+            <option value="BAJA">Baja</option>
+          </select>
+        </div>
+        <div class="form-field">
           <label>FECHA LÍMITE</label>
           <input type="date" class="glow-pill" [(ngModel)]="formDeadline">
         </div>
@@ -51,6 +59,9 @@
             {{ obj.name }}
             <span class="status-pill" [class.status-completed]="obj.status === 'COMPLETED'" [class.status-cancelled]="obj.status === 'CANCELLED'">
               {{ statusLabel(obj) }}
+            </span>
+            <span class="priority-pill priority-alta" [class.priority-media]="obj.priority === 'MEDIA'" [class.priority-baja]="obj.priority === 'BAJA'">
+              {{ priorityLabel(obj.priority) }}
             </span>
           </div>
           <div class="objective-actions">

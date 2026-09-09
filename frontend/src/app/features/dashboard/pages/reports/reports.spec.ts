@@ -65,6 +65,8 @@ const movimiento: Movimiento = {
   expenseCategoryId: 'c-1',
   amount: 1500,
   description: 'Despensa',
+  incomeClassification: null,
+  expenseType: 'VARIABLE',
   date: '2026-01-10T00:00:00.000Z',
   createdAt: '2026-01-10T00:00:00.000Z',
   updatedAt: '2026-01-10T00:00:00.000Z',
@@ -135,6 +137,22 @@ describe('DashboardReports', () => {
     expect(text).toContain('DESVIACIONES POR CATEGORÍA');
     expect(text).toContain('RECOMENDACIONES');
     expect(text).toContain('Considera apartar una parte de tu ingreso disponible para tus objetivos.');
+  });
+
+  it('muestra la clasificación/tipo del movimiento en la tabla', async () => {
+    periodoService.list.mockResolvedValue([periodoActivo]);
+    reportService.getPreliminary.mockResolvedValue(reportePrevio);
+    movimientoService.list.mockResolvedValue([movimiento]);
+    categoriaService.listIncome.mockResolvedValue([]);
+    categoriaService.listExpense.mockResolvedValue([]);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Variable');
+    expect(text).toContain('MOVIMIENTOS DEL PERÍODO');
   });
 
   it('muestra la desviación por categoría y el progreso del objetivo', async () => {

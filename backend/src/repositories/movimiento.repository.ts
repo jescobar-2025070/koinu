@@ -1,5 +1,10 @@
 import { Db } from '../config/db';
-import { Movimiento, MovimientoType } from '../entities/movimiento.entity';
+import {
+  Movimiento,
+  MovimientoType,
+  IncomeClassification,
+  ExpenseType,
+} from '../entities/movimiento.entity';
 
 interface MovimientoRow {
   id: string;
@@ -10,6 +15,8 @@ interface MovimientoRow {
   expense_category_id: string | null;
   amount: number;
   description: string | null;
+  income_classification: IncomeClassification | null;
+  expense_type: ExpenseType | null;
   date: Date;
   created_at: Date;
   updated_at: Date;
@@ -26,12 +33,16 @@ function mapRow(row: MovimientoRow): Movimiento {
     expenseCategoryId: row.expense_category_id,
     amount: row.amount,
     description: row.description,
+    incomeClassification: row.income_classification,
+    expenseType: row.expense_type,
     date: row.date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
   };
 }
+
+const COLUMNS = `id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, income_classification, expense_type, date, created_at, updated_at, deleted_at`;
 
 interface MovimientoCreateData {
   userId: string;
@@ -41,6 +52,8 @@ interface MovimientoCreateData {
   expenseCategoryId?: string | null;
   amount: number;
   description?: string;
+  incomeClassification?: IncomeClassification | null;
+  expenseType?: ExpenseType | null;
   date?: Date;
 }
 
@@ -49,7 +62,7 @@ export class MovimientoRepository {
 
   async findByUser(userId: string, periodId?: string): Promise<Movimiento[]> {
     let query = `
-      SELECT id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at
+      SELECT ${COLUMNS}
         FROM movimientos
        WHERE user_id = $1 AND deleted_at IS NULL`;
     const params: any[] = [userId];
@@ -66,7 +79,7 @@ export class MovimientoRepository {
 
   async findByPeriodo(periodId: string): Promise<Movimiento[]> {
     const result = await this.db.query<MovimientoRow>(
-      `SELECT id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at
+      `SELECT ${COLUMNS}
          FROM movimientos
         WHERE periodo_id = $1 AND deleted_at IS NULL
         ORDER BY date DESC, created_at DESC`,
@@ -77,7 +90,7 @@ export class MovimientoRepository {
 
   async findById(id: string): Promise<Movimiento | null> {
     const result = await this.db.query<MovimientoRow>(
-      `SELECT id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at
+      `SELECT ${COLUMNS}
          FROM movimientos
         WHERE id = $1 AND deleted_at IS NULL
         LIMIT 1`,
@@ -171,9 +184,9 @@ export class MovimientoRepository {
 
   async create(data: MovimientoCreateData): Promise<Movimiento> {
     const result = await this.db.query<MovimientoRow>(
-      `INSERT INTO movimientos (user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at`,
+      `INSERT INTO movimientos (user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, income_classification, expense_type, date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING ${COLUMNS}`,
       [
         data.userId,
         data.periodoId,
@@ -182,6 +195,8 @@ export class MovimientoRepository {
         data.expenseCategoryId ?? null,
         data.amount,
         data.description ?? null,
+        data.incomeClassification ?? null,
+        data.expenseType ?? null,
         data.date ?? new Date(),
       ],
     );
@@ -198,7 +213,13 @@ export class MovimientoRepository {
 
   async update(
     id: string,
-    data: { amount?: number; description?: string; date?: Date },
+    data: {
+      amount?: number;
+      description?: string;
+      incomeClassification?: import('../entities/movimiento.entity').IncomeClassification | null;
+      expenseType?: import('../entities/movimiento.entity').ExpenseType | null;
+      date?: Date;
+    },
   ): Promise<Movimiento | null> {
     const updates: string[] = [];
     const params: any[] = [id];
@@ -209,6 +230,14 @@ export class MovimientoRepository {
     if (data.description !== undefined) {
       params.push(data.description);
       updates.push(`description = $${params.length}`);
+    }
+    if (data.incomeClassification !== undefined) {
+      params.push(data.incomeClassification);
+      updates.push(`income_classification = $${params.length}`);
+    }
+    if (data.expenseType !== undefined) {
+      params.push(data.expenseType);
+      updates.push(`expense_type = $${params.length}`);
     }
     if (data.date !== undefined) {
       params.push(data.date);
@@ -222,7 +251,7 @@ export class MovimientoRepository {
     const result = await this.db.query<MovimientoRow>(
       `UPDATE movimientos SET ${updates.join(', ')}
        WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at`,
+       RETURNING ${COLUMNS}`,
       params,
     );
     return result.rows[0] ? mapRow(result.rows[0]) : null;

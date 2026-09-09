@@ -1,7 +1,12 @@
 import { pool, withTransaction } from '../../config/db';
 import { AppError } from '../../errors/app-error';
 import { ErrorCodes } from '../../errors/error-codes';
-import { Movimiento, MovimientoType } from '../../entities/movimiento.entity';
+import {
+  Movimiento,
+  MovimientoType,
+  IncomeClassification,
+  ExpenseType,
+} from '../../entities/movimiento.entity';
 import { PeriodoRepository } from '../../repositories/periodo.repository';
 import { MovimientoRepository } from '../../repositories/movimiento.repository';
 import { DetalleIngresoRepository } from '../../repositories/detalle-ingreso.repository';
@@ -18,6 +23,8 @@ export interface CrearMovimientoInput {
   retentionAmount?: number;
   taxTreatmentId?: string;
   amount?: number;
+  incomeClassification?: IncomeClassification;
+  expenseType?: ExpenseType;
   description?: string;
   date?: string;
 }
@@ -87,6 +94,13 @@ export class MovimientoService {
       });
     }
 
+    if (!data.incomeClassification || !['REGULAR', 'OCASIONAL'].includes(data.incomeClassification)) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'La clasificación del ingreso debe ser REGULAR u OCASIONAL.',
+        statusCode: 400,
+      });
+    }
+
     const categoria = await this.categoriaIngresoRepository.findById(data.incomeCategoryId);
     if (!categoria || (categoria.userId !== null && categoria.userId !== userId)) {
       throw new AppError(ErrorCodes.FORBIDDEN, {
@@ -122,6 +136,7 @@ export class MovimientoService {
         incomeCategoryId: data.incomeCategoryId,
         amount: net,
         description: data.description,
+        incomeClassification: data.incomeClassification,
         date: fecha,
       });
 
@@ -153,6 +168,13 @@ export class MovimientoService {
       });
     }
 
+    if (!data.expenseType || !['FIJO', 'VARIABLE'].includes(data.expenseType)) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'El tipo de gasto debe ser FIJO o VARIABLE.',
+        statusCode: 400,
+      });
+    }
+
     const categoria = await this.categoriaGastoRepository.findById(data.expenseCategoryId);
     if (!categoria || (categoria.userId !== null && categoria.userId !== userId)) {
       throw new AppError(ErrorCodes.FORBIDDEN, {
@@ -178,6 +200,7 @@ export class MovimientoService {
         expenseCategoryId: data.expenseCategoryId,
         amount,
         description: data.description,
+        expenseType: data.expenseType,
         date: fecha,
       });
 
@@ -248,6 +271,8 @@ export class MovimientoService {
       grossAmount?: number;
       retentionAmount?: number;
       taxTreatmentId?: string;
+      incomeClassification?: IncomeClassification;
+      expenseType?: ExpenseType;
     },
   ): Promise<Movimiento> {
     const movimiento = await this.movimientoRepository.findById(id);
@@ -304,6 +329,7 @@ export class MovimientoService {
       grossAmount?: number;
       retentionAmount?: number;
       taxTreatmentId?: string;
+      incomeClassification?: IncomeClassification;
     },
     fecha: Date | undefined,
   ): Promise<Movimiento> {
@@ -344,9 +370,23 @@ export class MovimientoService {
         netAmount: net,
       });
 
-      const payload: { amount: number; description?: string; date?: Date } = { amount: net };
+      const payload: {
+        amount: number;
+        description?: string;
+        incomeClassification?: IncomeClassification;
+        date?: Date;
+      } = { amount: net };
       if (data.description !== undefined) {
         payload.description = data.description;
+      }
+      if (data.incomeClassification !== undefined) {
+        if (!['REGULAR', 'OCASIONAL'].includes(data.incomeClassification)) {
+          throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+            message: 'La clasificación del ingreso debe ser REGULAR u OCASIONAL.',
+            statusCode: 400,
+          });
+        }
+        payload.incomeClassification = data.incomeClassification;
       }
       if (fecha !== undefined) {
         payload.date = fecha;
@@ -367,10 +407,20 @@ export class MovimientoService {
 
   private async updateGasto(
     movimiento: Movimiento,
-    data: { amount?: number; description?: string; date?: string },
+    data: {
+      amount?: number;
+      description?: string;
+      date?: string;
+      expenseType?: ExpenseType;
+    },
     fecha: Date | undefined,
   ): Promise<Movimiento> {
-    const payload: { amount?: number; description?: string; date?: Date } = {};
+    const payload: {
+      amount?: number;
+      description?: string;
+      expenseType?: ExpenseType;
+      date?: Date;
+    } = {};
     if (data.amount !== undefined) {
       if (typeof data.amount !== 'number' || isNaN(data.amount) || data.amount <= 0) {
         throw new AppError(ErrorCodes.VALIDATION_ERROR, {
@@ -382,6 +432,15 @@ export class MovimientoService {
     }
     if (data.description !== undefined) {
       payload.description = data.description;
+    }
+    if (data.expenseType !== undefined) {
+      if (!['FIJO', 'VARIABLE'].includes(data.expenseType)) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+          message: 'El tipo de gasto debe ser FIJO o VARIABLE.',
+          statusCode: 400,
+        });
+      }
+      payload.expenseType = data.expenseType;
     }
     if (fecha !== undefined) {
       payload.date = fecha;

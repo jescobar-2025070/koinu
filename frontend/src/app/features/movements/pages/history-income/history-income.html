@@ -6,6 +6,7 @@
         <tr>
           <th><span class="th-pill">FECHA</span></th>
           <th><span class="th-pill">CATEGORÍA</span></th>
+          <th><span class="th-pill">CLASIFICACIÓN</span></th>
           <th><span class="th-pill">DESCRIPCIÓN</span></th>
           <th><span class="th-pill">MONTO</span></th>
           <th><span class="th-pill">RETENCIÓN</span></th>
@@ -18,6 +19,12 @@
             <tr class="editing-row">
               <td>{{ formatDate(movement.date) }}</td>
               <td>{{ getCategoryName(movement.incomeCategoryId) }}</td>
+              <td>
+                <select class="glow-pill-inline" [(ngModel)]="editData.incomeClassification">
+                  <option value="REGULAR">Regular</option>
+                  <option value="OCASIONAL">Ocasional</option>
+                </select>
+              </td>
               <td><input type="text" class="glow-pill-inline" [(ngModel)]="editData.description"></td>
               <td><input type="number" step="0.01" class="glow-pill-inline" [(ngModel)]="editData.grossAmount"></td>
               <td>
@@ -41,6 +48,7 @@
             <tr>
               <td>{{ formatDate(movement.date) }}</td>
               <td>{{ getCategoryName(movement.incomeCategoryId) }}</td>
+              <td>{{ movement.incomeClassification === 'OCASIONAL' ? 'Ocasional' : 'Regular' }}</td>
               <td class="wrap">{{ movement.description ?? '—' }}</td>
               <td class="right">{{ formatCurrency(movement.amount) }}</td>
               <td class="right" style="color:rgba(255,255,255,0.5);">—</td>
@@ -53,7 +61,7 @@
           }
         } @empty {
           <tr>
-            <td colspan="6" style="text-align:center; color:rgba(255,255,255,0.5);">No hay ingresos registrados</td>
+            <td colspan="7" style="text-align:center; color:rgba(255,255,255,0.5);">No hay ingresos registrados</td>
           </tr>
         }
       </tbody>

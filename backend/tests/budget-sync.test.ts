@@ -51,6 +51,7 @@ async function addIncome(agent: request.Agent, periodId: string, grossAmount: nu
   return agent.post('/api/v1/movements').send({
     periodId,
     type: 'INCOME',
+    incomeClassification: 'REGULAR',
     incomeCategoryId: categoriaId,
     grossAmount,
     retentionAmount: 0,

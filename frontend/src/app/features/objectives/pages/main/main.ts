@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { ObjetivoService } from '../../../../core/services/objetivo.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
-import { Objetivo } from '../../../../core/models/api.models';
+import { Objetivo, ObjetivoPriority } from '../../../../core/models/api.models';
 
 @Component({
   selector: 'app-objectives-main',
@@ -25,6 +25,7 @@ export class ObjectivesMain implements OnInit {
   formTarget = 0;
   formDeadline = '';
   formPeriodId: string | undefined;
+  formPriority: ObjetivoPriority = 'MEDIA';
   periodos: { id: string; name: string }[] = [
     { id: '', name: 'Objetivo general (sin período)' },
   ];
@@ -100,8 +101,13 @@ export class ObjectivesMain implements OnInit {
     this.formTarget = 0;
     this.formDeadline = '';
     this.formPeriodId = '';
+    this.formPriority = 'MEDIA';
     this.saveMessage = '';
     this.cdr.markForCheck();
+  }
+
+  priorityLabel(p: ObjetivoPriority): string {
+    return p === 'ALTA' ? 'Prioridad Alta' : p === 'BAJA' ? 'Prioridad Baja' : 'Prioridad Media';
   }
 
   async createObjetivo(): Promise<void> {
@@ -118,6 +124,7 @@ export class ObjectivesMain implements OnInit {
         description: this.formDescription.trim() || undefined,
         targetAmount: this.formTarget,
         deadline: this.formDeadline || undefined,
+        priority: this.formPriority,
       });
       this.saveMessage = 'Objetivo creado correctamente.';
       this.showForm = false;

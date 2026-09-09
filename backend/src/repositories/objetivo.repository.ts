@@ -1,5 +1,5 @@
 import { Db } from '../config/db';
-import { Objetivo, ObjetivoStatus } from '../entities/objetivo.entity';
+import { Objetivo, ObjetivoPriority, ObjetivoStatus } from '../entities/objetivo.entity';
 
 interface ObjetivoRow {
   id: string;
@@ -11,12 +11,13 @@ interface ObjetivoRow {
   current_amount: number;
   deadline: Date | null;
   start_date: Date | null;
+  priority: ObjetivoPriority;
   status: ObjetivoStatus;
   created_at: Date;
   updated_at: Date;
 }
 
-const COLUMNS = `id, user_id, periodo_id, name, description, target_amount, current_amount, deadline, start_date, status, created_at, updated_at`;
+const COLUMNS = `id, user_id, periodo_id, name, description, target_amount, current_amount, deadline, start_date, priority, status, created_at, updated_at`;
 
 function mapRow(row: ObjetivoRow): Objetivo {
   return {
@@ -29,6 +30,7 @@ function mapRow(row: ObjetivoRow): Objetivo {
     currentAmount: row.current_amount,
     deadline: row.deadline,
     startDate: row.start_date,
+    priority: row.priority,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -90,10 +92,11 @@ export class ObjetivoRepository {
     targetAmount: number;
     deadline?: Date | null;
     startDate?: Date | null;
+    priority: ObjetivoPriority;
   }): Promise<Objetivo> {
     const result = await this.db.query<ObjetivoRow>(
-      `INSERT INTO objetivos (user_id, periodo_id, name, description, target_amount, deadline, start_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO objetivos (user_id, periodo_id, name, description, target_amount, deadline, start_date, priority)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${COLUMNS}`,
       [
         data.userId,
@@ -103,6 +106,7 @@ export class ObjetivoRepository {
         data.targetAmount,
         data.deadline ?? null,
         data.startDate ?? null,
+        data.priority,
       ],
     );
     return mapRow(result.rows[0]);
@@ -117,6 +121,7 @@ export class ObjetivoRepository {
       deadline?: Date | null;
       startDate?: Date | null;
       periodoId?: string | null;
+      priority?: ObjetivoPriority;
     },
   ): Promise<Objetivo | null> {
     const updates: string[] = [];
@@ -156,6 +161,12 @@ export class ObjetivoRepository {
     if (data.periodoId !== undefined) {
       updates.push(`periodo_id = $${paramIndex}`);
       params.push(data.periodoId);
+      paramIndex++;
+    }
+
+    if (data.priority !== undefined) {
+      updates.push(`priority = $${paramIndex}`);
+      params.push(data.priority);
       paramIndex++;
     }
 

@@ -172,11 +172,14 @@ export class DashboardReports implements OnInit {
   }
 
   exportCsv(): void {
-    const headers = ['Fecha', 'Tipo', 'Categoría', 'Descripción', 'Monto'];
+    const headers = ['Fecha', 'Tipo', 'Categoría', 'Clasificación', 'Descripción', 'Monto'];
     const rows = this.movements.map((m) => [
       this.formatDate(m.date),
       m.type === 'INCOME' ? 'Ingreso' : 'Gasto',
       this.getCategoryName(m.type === 'INCOME' ? m.incomeCategoryId : m.expenseCategoryId),
+      m.type === 'INCOME'
+        ? (m.incomeClassification === 'OCASIONAL' ? 'Ocasional' : 'Regular')
+        : (m.expenseType === 'FIJO' ? 'Fijo' : 'Variable'),
       m.description ?? '',
       m.amount.toFixed(2),
     ]);

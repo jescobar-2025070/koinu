@@ -4,7 +4,7 @@ import { SidebarService } from '../../../../core/services/sidebar.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { TratamientoFiscalService } from '../../../../core/services/tratamiento-fiscal.service';
-import { Movimiento, Categoria, TratamientoFiscal } from '../../../../core/models/api.models';
+import { Movimiento, Categoria, TratamientoFiscal, IncomeClassification } from '../../../../core/models/api.models';
 
 @Component({
   selector: 'app-movements-history-income',
@@ -28,6 +28,7 @@ export class MovementsHistoryIncome implements OnInit {
     grossAmount: 0,
     retentionAmount: 0,
     taxTreatmentId: '',
+    incomeClassification: 'REGULAR' as IncomeClassification,
   };
 
   ngOnInit(): void {
@@ -72,6 +73,7 @@ export class MovementsHistoryIncome implements OnInit {
       grossAmount: movement.amount,
       retentionAmount: 0,
       taxTreatmentId: this.tratamientos[0]?.id ?? '',
+      incomeClassification: movement.incomeClassification ?? 'REGULAR',
     };
     void this.movimientoService.getById(movement.id).then((res) => {
       if (res?.detalle) {
@@ -102,11 +104,17 @@ export class MovementsHistoryIncome implements OnInit {
         grossAmount: this.editData.grossAmount,
         retentionAmount: this.editData.retentionAmount,
         taxTreatmentId: this.editData.taxTreatmentId || undefined,
+        incomeClassification: this.editData.incomeClassification,
         description: this.editData.description,
       });
       const idx = this.movements.findIndex((m) => m.id === movement.id);
       if (idx !== -1) {
-        this.movements[idx] = { ...this.movements[idx], amount: updated.amount, description: updated.description };
+        this.movements[idx] = {
+          ...this.movements[idx],
+          amount: updated.amount,
+          description: updated.description,
+          incomeClassification: updated.incomeClassification,
+        };
       }
       this.cdr.markForCheck();
     } catch (e) {

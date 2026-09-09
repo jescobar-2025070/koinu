@@ -6,6 +6,7 @@
         <tr>
           <th><span class="th-pill">FECHA</span></th>
           <th><span class="th-pill">CATEGORÍA</span></th>
+          <th><span class="th-pill">TIPO</span></th>
           <th><span class="th-pill">DESCRIPCIÓN</span></th>
           <th><span class="th-pill">MONTO</span></th>
           <th></th>
@@ -16,6 +17,7 @@
           <tr>
             <td>{{ formatDate(movement.date) }}</td>
             <td>{{ getCategoryName(movement.expenseCategoryId) }}</td>
+            <td>{{ movement.expenseType === 'FIJO' ? 'Fijo' : 'Variable' }}</td>
             <td class="wrap">{{ movement.description ?? '—' }}</td>
             <td class="right">{{ formatCurrency(movement.amount) }}</td>
             <td>
@@ -26,7 +28,7 @@
           </tr>
         } @empty {
           <tr>
-            <td colspan="5" style="text-align:center; color:rgba(255,255,255,0.5);">No hay gastos registrados</td>
+            <td colspan="6" style="text-align:center; color:rgba(255,255,255,0.5);">No hay gastos registrados</td>
           </tr>
         }
       </tbody>

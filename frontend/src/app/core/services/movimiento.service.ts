@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
-import { DetalleIngreso, Movimiento, MovimientoStats } from '../models/api.models';
+import { DetalleIngreso, ExpenseType, IncomeClassification, Movimiento, MovimientoStats } from '../models/api.models';
 
 @Injectable({ providedIn: 'root' })
 export class MovimientoService {
@@ -22,6 +22,8 @@ export class MovimientoService {
     retentionAmount?: number;
     taxTreatmentId?: string;
     amount?: number;
+    incomeClassification?: IncomeClassification;
+    expenseType?: ExpenseType;
     description?: string;
     date?: string;
   }): Promise<{ movimiento: Movimiento; detalle?: DetalleIngreso }> {
@@ -47,6 +49,8 @@ export class MovimientoService {
       grossAmount?: number;
       retentionAmount?: number;
       taxTreatmentId?: string;
+      incomeClassification?: IncomeClassification;
+      expenseType?: ExpenseType;
     },
   ): Promise<Movimiento> {
     const res = await firstValueFrom(this.api.put<{ movimiento: Movimiento }>(`/movements/${id}`, data));
