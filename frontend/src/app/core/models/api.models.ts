@@ -198,3 +198,32 @@ export interface TratamientoFiscal {
   isActive: boolean;
   createdAt: string;
 }
+
+export type MovimientoAuditoriaTipo = 'CREADO' | 'MODIFICADO' | 'ELIMINADO';
+
+export interface MovimientoAuditoria {
+  id: string;
+  movimientoId: string;
+  periodoId: string;
+  userId: string;
+  tipo: MovimientoAuditoriaTipo;
+  resumen: {
+    movimiento?: {
+      type: MovimientoType;
+      amount: number;
+      description: string | null;
+      date: string;
+      incomeClassification?: IncomeClassification | null;
+      expenseType?: ExpenseType | null;
+    };
+    detalle?: {
+      grossAmount: number;
+      retentionAmount: number;
+      netAmount: number;
+    };
+    antes?: Record<string, unknown>;
+    despues?: Record<string, unknown>;
+    cambios?: Record<string, [unknown, unknown]>;
+  };
+  createdAt: string;
+}

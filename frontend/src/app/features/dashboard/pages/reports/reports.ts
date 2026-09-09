@@ -4,9 +4,11 @@ import { MovimientoService } from '../../../../core/services/movimiento.service'
 import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { ReportService } from '../../../../core/services/report.service';
+import { AuditService } from '../../../../core/services/audit.service';
 import {
   Categoria,
   Movimiento,
+  MovimientoAuditoria,
   Periodo,
   ReportCategoryRow,
   ReportData,
@@ -23,6 +25,7 @@ export class DashboardReports implements OnInit {
   private readonly periodoService = inject(PeriodoService);
   private readonly categoriaService = inject(CategoriaService);
   private readonly reportService = inject(ReportService);
+  private readonly auditService = inject(AuditService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   periodos: Periodo[] = [];
@@ -32,6 +35,7 @@ export class DashboardReports implements OnInit {
   reportType: 'PRELIMINAR' | 'FINAL' = 'PRELIMINAR';
   generadoEn = '';
   movements: Movimiento[] = [];
+  auditoria: MovimientoAuditoria[] = [];
   private categories: Categoria[] = [];
 
   ngOnInit(): void {
@@ -64,6 +68,7 @@ export class DashboardReports implements OnInit {
     if (!this.selectedPeriodId) {
       this.report = null;
       this.movements = [];
+      this.auditoria = [];
       this.cdr.markForCheck();
       return;
     }
@@ -99,13 +104,15 @@ export class DashboardReports implements OnInit {
     }
 
     try {
-      const [movimientos, ingresos, gastos] = await Promise.all([
+      const [movimientos, ingresos, gastos, auditoria] = await Promise.all([
         this.movimientoService.list(this.selectedPeriodId),
         this.categoriaService.listIncome(),
         this.categoriaService.listExpense(),
+        this.auditService.getMovementsAudit(this.selectedPeriodId).catch(() => []),
       ]);
       this.categories = [...ingresos, ...gastos];
       this.movements = movimientos;
+      this.auditoria = auditoria;
     } catch (e) {
       console.error('Error loading movements:', e);
     }
@@ -169,6 +176,48 @@ export class DashboardReports implements OnInit {
   formatDate(dateStr: string): string {
     const d = new Date(dateStr);
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  }
+
+  formatDateTime(dateStr: string): string {
+    const d = new Date(dateStr);
+    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `${this.formatDate(dateStr)} ${time}`;
+  }
+
+  auditoriaEventoLabel(tipo: string): string {
+    switch (tipo) {
+      case 'CREADO':
+        return 'CREADO';
+      case 'MODIFICADO':
+        return 'MODIFICADO';
+      case 'ELIMINADO':
+        return 'ELIMINADO';
+      default:
+        return tipo;
+    }
+  }
+
+  auditoriaTipoMovimiento(resumen: MovimientoAuditoria['resumen']): string {
+    const tipo = resumen?.movimiento?.type;
+    return tipo === 'INCOME' ? 'Ingreso' : 'Gasto';
+  }
+
+  auditoriaMonto(resumen: MovimientoAuditoria['resumen']): number {
+    return Number(resumen?.movimiento?.amount ?? 0);
+  }
+
+  auditoriaDescripcion(resumen: MovimientoAuditoria['resumen']): string {
+    return resumen?.movimiento?.description ?? '—';
+  }
+
+  auditoriaCambios(resumen: MovimientoAuditoria['resumen']): string {
+    const cambios = resumen?.cambios;
+    if (!cambios) {
+      return '—';
+    }
+    return Object.entries(cambios)
+      .map(([field, [antes, despues]]) => `${field}: ${antes} → ${despues}`)
+      .join(', ');
   }
 
   exportCsv(): void {

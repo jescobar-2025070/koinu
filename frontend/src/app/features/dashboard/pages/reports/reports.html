@@ -177,5 +177,57 @@
         </tbody>
       </table>
     </div>
+
+    <div class="section-subtitle">AUDITORÍA DE MOVIMIENTOS</div>
+    <div class="table-wrap scroll-y">
+      <table>
+        <thead>
+          <tr>
+            <th><span class="th-pill">FECHA</span></th>
+            <th><span class="th-pill">EVENTO</span></th>
+            <th><span class="th-pill">MOVIMIENTO</span></th>
+            <th><span class="th-pill">MONTO</span></th>
+            <th><span class="th-pill">DETALLE</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of auditoria; track entry.id) {
+            <tr>
+              <td>{{ formatDateTime(entry.createdAt) }}</td>
+              <td>
+                <span
+                  class="audit-pill"
+                  [class.audit-creado]="entry.tipo === 'CREADO'"
+                  [class.audit-modificado]="entry.tipo === 'MODIFICADO'"
+                  [class.audit-eliminado]="entry.tipo === 'ELIMINADO'"
+                >{{ auditoriaEventoLabel(entry.tipo) }}</span>
+              </td>
+              <td class="wrap">
+                {{ auditoriaTipoMovimiento(entry.resumen) }}
+                @if (entry.tipo === 'MODIFICADO' && entry.resumen.cambios) {
+                  <span style="color:rgba(255,255,255,0.55);">({{ auditoriaDescripcion(entry.resumen) && auditoriaDescripcion(entry.resumen) !== '—' ? auditoriaDescripcion(entry.resumen) : 'sin descripción' }})</span>
+                } @else {
+                  <span style="color:rgba(255,255,255,0.55);">({{ auditoriaDescripcion(entry.resumen) }})</span>
+                }
+              </td>
+              <td class="right">{{ formatCurrency(auditoriaMonto(entry.resumen)) }}</td>
+              <td class="wrap">
+                @if (entry.tipo === 'MODIFICADO') {
+                  {{ auditoriaCambios(entry.resumen) }}
+                } @else {
+                  —
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" style="text-align:center; color:rgba(255,255,255,0.5);">
+                No hay actividad registrada en el período seleccionado
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
   }
 </div>

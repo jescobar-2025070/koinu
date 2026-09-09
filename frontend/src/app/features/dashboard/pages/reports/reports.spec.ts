@@ -6,7 +6,8 @@ import { PeriodoService } from '../../../../core/services/periodo.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { SidebarService } from '../../../../core/services/sidebar.service';
-import { Movimiento, Periodo, ReportData } from '../../../../core/models/api.models';
+import { AuditService } from '../../../../core/services/audit.service';
+import { Movimiento, Periodo, ReportData, MovimientoAuditoria } from '../../../../core/models/api.models';
 
 const periodoActivo: Periodo = {
   id: 'p-1',
@@ -73,6 +74,32 @@ const movimiento: Movimiento = {
   deletedAt: null,
 };
 
+const auditoria: MovimientoAuditoria[] = [
+  {
+    id: 'a-1',
+    movimientoId: 'm-1',
+    periodoId: 'p-1',
+    userId: 'u-1',
+    tipo: 'MODIFICADO',
+    resumen: {
+      movimiento: { type: 'EXPENSE', amount: 800, description: 'Despensa', date: '2026-01-10T00:00:00.000Z', expenseType: 'VARIABLE' },
+      cambios: { amount: [500, 800], description: [null, 'Despensa'] },
+    },
+    createdAt: '2026-01-11T12:00:00.000Z',
+  },
+  {
+    id: 'a-2',
+    movimientoId: 'm-2',
+    periodoId: 'p-1',
+    userId: 'u-1',
+    tipo: 'ELIMINADO',
+    resumen: {
+      movimiento: { type: 'EXPENSE', amount: 300, description: 'Transporte', date: '2026-01-12T00:00:00.000Z', expenseType: 'FIJO' },
+    },
+    createdAt: '2026-01-12T12:00:00.000Z',
+  },
+];
+
 type Mock<T> = { [K in keyof T]: ReturnType<typeof vi.fn> };
 
 async function settle(): Promise<void> {
@@ -90,6 +117,7 @@ describe('DashboardReports', () => {
   let movimientoService: Mock<MovimientoService>;
   let categoriaService: Mock<CategoriaService>;
   let sidebarService: Mock<SidebarService>;
+  let auditService: Mock<AuditService>;
 
   beforeEach(() => {
     reportService = { getPreliminary: vi.fn(), getFinal: vi.fn() };
@@ -97,6 +125,7 @@ describe('DashboardReports', () => {
     movimientoService = { list: vi.fn(), stats: vi.fn() } as Mock<MovimientoService>;
     categoriaService = { listIncome: vi.fn(), listExpense: vi.fn() } as Mock<CategoriaService>;
     sidebarService = { setDashboard: vi.fn() } as Mock<SidebarService>;
+    auditService = { getMovementsAudit: vi.fn() } as Mock<AuditService>;
 
     TestBed.configureTestingModule({
       imports: [DashboardReports],
@@ -107,6 +136,7 @@ describe('DashboardReports', () => {
         { provide: MovimientoService, useValue: movimientoService },
         { provide: CategoriaService, useValue: categoriaService },
         { provide: SidebarService, useValue: sidebarService },
+        { provide: AuditService, useValue: auditService },
       ],
     });
 
@@ -120,6 +150,7 @@ describe('DashboardReports', () => {
     movimientoService.list.mockResolvedValue([movimiento]);
     categoriaService.listIncome.mockResolvedValue([]);
     categoriaService.listExpense.mockResolvedValue([]);
+    auditService.getMovementsAudit.mockResolvedValue([]);
 
     fixture.detectChanges();
     await settle();
@@ -145,6 +176,7 @@ describe('DashboardReports', () => {
     movimientoService.list.mockResolvedValue([movimiento]);
     categoriaService.listIncome.mockResolvedValue([]);
     categoriaService.listExpense.mockResolvedValue([]);
+    auditService.getMovementsAudit.mockResolvedValue([]);
 
     fixture.detectChanges();
     await settle();
@@ -161,6 +193,7 @@ describe('DashboardReports', () => {
     movimientoService.list.mockResolvedValue([movimiento]);
     categoriaService.listIncome.mockResolvedValue([]);
     categoriaService.listExpense.mockResolvedValue([]);
+    auditService.getMovementsAudit.mockResolvedValue([]);
 
     fixture.detectChanges();
     await settle();
@@ -181,6 +214,7 @@ describe('DashboardReports', () => {
     movimientoService.list.mockResolvedValue([]);
     categoriaService.listIncome.mockResolvedValue([]);
     categoriaService.listExpense.mockResolvedValue([]);
+    auditService.getMovementsAudit.mockResolvedValue([]);
 
     fixture.detectChanges();
     await settle();
@@ -207,6 +241,26 @@ describe('DashboardReports', () => {
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('No hay períodos. Crea un período para generar un informe.');
     expect(reportService.getPreliminary).not.toHaveBeenCalled();
+  });
+
+  it('renderiza la auditoría de movimientos del período', async () => {
+    periodoService.list.mockResolvedValue([periodoActivo]);
+    reportService.getPreliminary.mockResolvedValue(reportePrevio);
+    movimientoService.list.mockResolvedValue([movimiento]);
+    categoriaService.listIncome.mockResolvedValue([]);
+    categoriaService.listExpense.mockResolvedValue([]);
+    auditService.getMovementsAudit.mockResolvedValue(auditoria);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    expect(auditService.getMovementsAudit).toHaveBeenCalledWith('p-1');
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('AUDITORÍA DE MOVIMIENTOS');
+    expect(text).toContain('MODIFICADO');
+    expect(text).toContain('ELIMINADO');
+    expect(text).toContain('amount: 500 → 800');
   });
 
   it('formatCurrency formatea en quetzales', () => {

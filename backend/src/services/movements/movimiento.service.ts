@@ -1,4 +1,4 @@
-import { pool, withTransaction } from '../../config/db';
+import { pool, withTransaction, Db } from '../../config/db';
 import { AppError } from '../../errors/app-error';
 import { ErrorCodes } from '../../errors/error-codes';
 import {
@@ -7,8 +7,10 @@ import {
   IncomeClassification,
   ExpenseType,
 } from '../../entities/movimiento.entity';
+import { MovimientoAuditoriaTipo } from '../../entities/movimiento-auditoria.entity';
 import { PeriodoRepository } from '../../repositories/periodo.repository';
 import { MovimientoRepository } from '../../repositories/movimiento.repository';
+import { MovimientoAuditoriaRepository } from '../../repositories/movimiento-auditoria.repository';
 import { DetalleIngresoRepository } from '../../repositories/detalle-ingreso.repository';
 import { CategoriaIngresoRepository } from '../../repositories/categoria-ingreso.repository';
 import { CategoriaGastoRepository } from '../../repositories/categoria-gasto.repository';
@@ -148,6 +150,21 @@ export class MovimientoService {
         netAmount: net,
       });
 
+      await this.logAuditoria(client, {
+        movimientoId: movimiento.id,
+        periodoId,
+        userId,
+        tipo: 'CREADO',
+        resumen: {
+          movimiento: this.movementSummary(movimiento),
+          detalle: {
+            grossAmount: gross,
+            retentionAmount: retention,
+            netAmount: net,
+          },
+        },
+      });
+
       const budgetService = new BudgetService();
       await budgetService.recomputeOverruns(client, periodoId);
 
@@ -204,6 +221,16 @@ export class MovimientoService {
         date: fecha,
       });
 
+      await this.logAuditoria(client, {
+        movimientoId: movimiento.id,
+        periodoId,
+        userId,
+        tipo: 'CREADO',
+        resumen: {
+          movimiento: this.movementSummary(movimiento),
+        },
+      });
+
       const budgetService = new BudgetService();
       await budgetService.recomputeOverruns(client, periodoId);
 
@@ -256,6 +283,15 @@ export class MovimientoService {
           statusCode: 500,
         });
       }
+      await this.logAuditoria(client, {
+        movimientoId: movimiento.id,
+        periodoId: movimiento.periodoId,
+        userId,
+        tipo: 'ELIMINADO',
+        resumen: {
+          movimiento: this.movementSummary(movimiento),
+        },
+      });
       const budgetService = new BudgetService();
       await budgetService.recomputeOverruns(client, movimiento.periodoId);
     });
@@ -399,6 +435,13 @@ export class MovimientoService {
           statusCode: 500,
         });
       }
+      await this.logAuditoria(client, {
+        movimientoId: movimiento.id,
+        periodoId: movimiento.periodoId,
+        userId: movimiento.userId,
+        tipo: 'MODIFICADO',
+        resumen: this.buildModifyResumen(movimiento, updated),
+      });
       const budgetService = new BudgetService();
       await budgetService.recomputeOverruns(client, movimiento.periodoId);
       return updated;
@@ -455,6 +498,13 @@ export class MovimientoService {
           statusCode: 500,
         });
       }
+      await this.logAuditoria(client, {
+        movimientoId: movimiento.id,
+        periodoId: movimiento.periodoId,
+        userId: movimiento.userId,
+        tipo: 'MODIFICADO',
+        resumen: this.buildModifyResumen(movimiento, updated),
+      });
       const budgetService = new BudgetService();
       await budgetService.recomputeOverruns(client, movimiento.periodoId);
       return updated;
@@ -463,5 +513,52 @@ export class MovimientoService {
 
   async getStats(userId: string, periodId?: string): Promise<{ totalIngresos: number; totalGastos: number }> {
     return this.movimientoRepository.getStats(userId, periodId);
+  }
+
+  private movementSummary(movement: Movimiento): Record<string, unknown> {
+    if (movement.type === 'INCOME') {
+      return {
+        type: 'INCOME',
+        amount: Number(movement.amount),
+        description: movement.description ?? null,
+        date: movement.date,
+        incomeClassification: movement.incomeClassification ?? null,
+      };
+    }
+    return {
+      type: 'EXPENSE',
+      amount: Number(movement.amount),
+      description: movement.description ?? null,
+      date: movement.date,
+      expenseType: movement.expenseType ?? null,
+    };
+  }
+
+  private buildModifyResumen(antes: Movimiento, despues: Movimiento): Record<string, unknown> {
+    const antesSummary = this.movementSummary(antes);
+    const despuesSummary = this.movementSummary(despues);
+    const cambios: Record<string, [unknown, unknown]> = {};
+    for (const key of Object.keys(despuesSummary)) {
+      const a = antesSummary[key];
+      const b = despuesSummary[key];
+      if (String(a) !== String(b)) {
+        cambios[key] = [a, b];
+      }
+    }
+    return { antes: antesSummary, despues: despuesSummary, cambios };
+  }
+
+  private async logAuditoria(
+    client: Db,
+    entry: {
+      movimientoId: string;
+      periodoId: string;
+      userId: string;
+      tipo: MovimientoAuditoriaTipo;
+      resumen: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    const auditoriaRepo = new MovimientoAuditoriaRepository(client);
+    await auditoriaRepo.create(entry);
   }
 }

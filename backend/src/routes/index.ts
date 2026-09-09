@@ -12,6 +12,7 @@ import { dashboardRouter } from './dashboard.routes';
 import { budgetRouter } from './budget.routes';
 import { reportRouter } from './report.routes';
 import { tratamientoFiscalRouter } from './tratamiento-fiscal.routes';
+import { auditoriaRouter } from './auditoria.routes';
 
 const apiRouter = Router();
 
@@ -24,6 +25,7 @@ apiRouter.use('/periods', periodoRouter());
 apiRouter.use('/periods', dashboardRouter());
 apiRouter.use('/periods', budgetRouter());
 apiRouter.use('/periods', reportRouter());
+apiRouter.use('/periods', auditoriaRouter());
 apiRouter.use('/movements', movimientoRouter());
 apiRouter.use('/objectives', objetivoRouter());
 apiRouter.use('/categories', categoriaRouter());
