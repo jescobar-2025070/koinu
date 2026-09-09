@@ -189,3 +189,34 @@
     display: none;
   }
 }
+
+.footer-row {
+  position: absolute; /* O 'fixed' si quieres que siga ahí al hacer scroll */
+  bottom: 0;          /* Lo pega a la parte inferior de la pantalla */
+  left: 0;            /* Lo alinea a la izquierda */
+  width: 100%;        /* Hace que ocupe todo el ancho */
+  box-sizing: border-box; /* Evita que el padding sume ancho extra y cause scroll horizontal */
+  
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 32px 22px;
+}
+
+.copyright {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.legal-pill {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  padding: 10px 22px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  gap: 18px;
+}
