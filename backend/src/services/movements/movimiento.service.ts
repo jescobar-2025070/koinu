@@ -241,7 +241,14 @@ export class MovimientoService {
   async update(
     id: string,
     userId: string,
-    data: { amount?: number; description?: string; date?: string },
+    data: {
+      amount?: number;
+      description?: string;
+      date?: string;
+      grossAmount?: number;
+      retentionAmount?: number;
+      taxTreatmentId?: string;
+    },
   ): Promise<Movimiento> {
     const movimiento = await this.movimientoRepository.findById(id);
     if (!movimiento) {
@@ -265,6 +272,104 @@ export class MovimientoService {
       });
     }
 
+    let fecha: Date | undefined;
+    if (data.date !== undefined) {
+      fecha = new Date(data.date);
+      if (isNaN(fecha.getTime())) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+          message: 'La fecha no tiene un formato válido.',
+          statusCode: 400,
+        });
+      }
+      if (fecha < periodo.startDate || fecha > periodo.endDate) {
+        throw new AppError(ErrorCodes.DATE_OUTSIDE_PERIOD, {
+          message: 'La fecha está fuera del periodo seleccionado.',
+          statusCode: 422,
+        });
+      }
+    }
+
+    if (movimiento.type === 'INCOME') {
+      return this.updateIngreso(movimiento, data, fecha);
+    }
+    return this.updateGasto(movimiento, data, fecha);
+  }
+
+  private async updateIngreso(
+    movimiento: Movimiento,
+    data: {
+      amount?: number;
+      description?: string;
+      date?: string;
+      grossAmount?: number;
+      retentionAmount?: number;
+      taxTreatmentId?: string;
+    },
+    fecha: Date | undefined,
+  ): Promise<Movimiento> {
+    return withTransaction(async (client) => {
+      const movimientoRepo = new MovimientoRepository(client);
+      const detalleRepo = new DetalleIngresoRepository(client);
+      const detalle = await detalleRepo.findById(movimiento.id);
+
+      const gross = data.grossAmount ?? data.amount ?? Number(detalle?.grossAmount ?? 0);
+      if (typeof gross !== 'number' || isNaN(gross) || gross <= 0) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+          message: 'El monto bruto debe ser un número mayor a 0.',
+          statusCode: 400,
+        });
+      }
+      const retention = data.retentionAmount ?? Number(detalle?.retentionAmount ?? 0);
+      if (retention < 0 || retention > gross) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+          message: 'La retención debe ser un valor entre 0 y el monto bruto.',
+          statusCode: 400,
+        });
+      }
+      const net = gross - retention;
+      const taxTreatmentId =
+        data.taxTreatmentId !== undefined ? data.taxTreatmentId : (detalle?.taxTreatmentId ?? null);
+
+      if (!detalle) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'El ingreso no tiene detalle fiscal asociado.',
+          statusCode: 500,
+        });
+      }
+
+      await detalleRepo.update(movimiento.id, {
+        taxTreatmentId,
+        grossAmount: gross,
+        retentionAmount: retention,
+        netAmount: net,
+      });
+
+      const payload: { amount: number; description?: string; date?: Date } = { amount: net };
+      if (data.description !== undefined) {
+        payload.description = data.description;
+      }
+      if (fecha !== undefined) {
+        payload.date = fecha;
+      }
+
+      const updated = await movimientoRepo.update(movimiento.id, payload);
+      if (!updated) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'Error al actualizar el movimiento.',
+          statusCode: 500,
+        });
+      }
+      const budgetService = new BudgetService();
+      await budgetService.recomputeOverruns(client, movimiento.periodoId);
+      return updated;
+    });
+  }
+
+  private async updateGasto(
+    movimiento: Movimiento,
+    data: { amount?: number; description?: string; date?: string },
+    fecha: Date | undefined,
+  ): Promise<Movimiento> {
     const payload: { amount?: number; description?: string; date?: Date } = {};
     if (data.amount !== undefined) {
       if (typeof data.amount !== 'number' || isNaN(data.amount) || data.amount <= 0) {
@@ -278,31 +383,23 @@ export class MovimientoService {
     if (data.description !== undefined) {
       payload.description = data.description;
     }
-    if (data.date !== undefined) {
-      const fecha = new Date(data.date);
-      if (isNaN(fecha.getTime())) {
-        throw new AppError(ErrorCodes.VALIDATION_ERROR, {
-          message: 'La fecha no tiene un formato válido.',
-          statusCode: 400,
-        });
-      }
-      if (fecha < periodo.startDate || fecha > periodo.endDate) {
-        throw new AppError(ErrorCodes.DATE_OUTSIDE_PERIOD, {
-          message: 'La fecha está fuera del periodo seleccionado.',
-          statusCode: 422,
-        });
-      }
+    if (fecha !== undefined) {
       payload.date = fecha;
     }
 
-    const updated = await this.movimientoRepository.update(id, payload);
-    if (!updated) {
-      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
-        message: 'Error al actualizar el movimiento.',
-        statusCode: 500,
-      });
-    }
-    return updated;
+    return withTransaction(async (client) => {
+      const movimientoRepo = new MovimientoRepository(client);
+      const updated = await movimientoRepo.update(movimiento.id, payload);
+      if (!updated) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'Error al actualizar el movimiento.',
+          statusCode: 500,
+        });
+      }
+      const budgetService = new BudgetService();
+      await budgetService.recomputeOverruns(client, movimiento.periodoId);
+      return updated;
+    });
   }
 
   async getStats(userId: string, periodId?: string): Promise<{ totalIngresos: number; totalGastos: number }> {

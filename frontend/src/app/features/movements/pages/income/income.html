@@ -23,10 +23,10 @@
       </div>
       <div class="form-field">
         <label>TIPO DE IMPUESTO</label>
-        <select class="glow-pill" [(ngModel)]="impuestoPct">
-          <option [value]="5">Retención de ISR (5%)</option>
-          <option [value]="7">Retención de ISR (7%)</option>
-          <option [value]="0">Sin retención</option>
+        <select class="glow-pill" [(ngModel)]="selectedTratamientoId">
+          @for (t of tratamientos; track t.id) {
+            <option [value]="t.id">{{ t.name }}</option>
+          }
         </select>
       </div>
       <div class="form-field">

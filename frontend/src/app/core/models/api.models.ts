@@ -178,3 +178,11 @@ export interface SystemHealth {
   uptimeSeconds: number;
   timestamp: string;
 }
+
+export interface TratamientoFiscal {
+  id: string;
+  name: string;
+  rate: number;
+  isActive: boolean;
+  createdAt: string;
+}

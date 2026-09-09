@@ -32,9 +32,22 @@ export class MovimientoService {
     await firstValueFrom(this.api.delete(`/movements/${id}`));
   }
 
+  async getById(
+    id: string,
+  ): Promise<{ movimiento: Movimiento; detalle?: DetalleIngreso } | null> {
+    return await firstValueFrom(this.api.get<{ movimiento: Movimiento; detalle?: DetalleIngreso }>(`/movements/${id}`));
+  }
+
   async update(
     id: string,
-    data: { amount?: number; description?: string; date?: string },
+    data: {
+      amount?: number;
+      description?: string;
+      date?: string;
+      grossAmount?: number;
+      retentionAmount?: number;
+      taxTreatmentId?: string;
+    },
   ): Promise<Movimiento> {
     const res = await firstValueFrom(this.api.put<{ movimiento: Movimiento }>(`/movements/${id}`, data));
     return res.movimiento;

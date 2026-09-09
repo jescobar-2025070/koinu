@@ -51,4 +51,26 @@ export class DetalleIngresoRepository {
     );
     return mapRow(result.rows[0]);
   }
+
+  async update(
+    movementId: string,
+    data: {
+      taxTreatmentId?: string | null;
+      grossAmount: number;
+      retentionAmount: number;
+      netAmount: number;
+    },
+  ): Promise<DetalleIngreso | null> {
+    if (data.netAmount !== data.grossAmount - data.retentionAmount) {
+      throw new Error('El monto neto debe ser igual a bruto - retención.');
+    }
+    const result = await this.db.query<DetalleRow>(
+      `UPDATE detalles_ingreso
+          SET tax_treatment_id = $2, gross_amount = $3, retention_amount = $4, net_amount = $5
+        WHERE movement_id = $1
+        RETURNING movement_id, tax_treatment_id, gross_amount, retention_amount, net_amount`,
+      [movementId, data.taxTreatmentId ?? null, data.grossAmount, data.retentionAmount, data.netAmount],
+    );
+    return result.rows[0] ? mapRow(result.rows[0]) : null;
+  }
 }

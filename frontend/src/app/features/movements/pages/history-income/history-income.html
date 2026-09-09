@@ -8,6 +8,7 @@
           <th><span class="th-pill">CATEGORÍA</span></th>
           <th><span class="th-pill">DESCRIPCIÓN</span></th>
           <th><span class="th-pill">MONTO</span></th>
+          <th><span class="th-pill">RETENCIÓN</span></th>
           <th></th>
         </tr>
       </thead>
@@ -18,7 +19,15 @@
               <td>{{ formatDate(movement.date) }}</td>
               <td>{{ getCategoryName(movement.incomeCategoryId) }}</td>
               <td><input type="text" class="glow-pill-inline" [(ngModel)]="editData.description"></td>
-              <td><input type="number" class="glow-pill-inline" [(ngModel)]="editData.amount"></td>
+              <td><input type="number" step="0.01" class="glow-pill-inline" [(ngModel)]="editData.grossAmount"></td>
+              <td>
+                <input type="number" step="0.01" class="glow-pill-inline" [(ngModel)]="editData.retentionAmount">
+                <select class="glow-pill-inline" [(ngModel)]="editData.taxTreatmentId" (ngModelChange)="applyTreatmentRate()">
+                  @for (t of tratamientos; track t.id) {
+                    <option [value]="t.id">{{ t.name }}</option>
+                  }
+                </select>
+              </td>
               <td class="actions-cell">
                 <button class="row-action row-action--save" (click)="saveEdit(movement)">
                   <span class="material-symbols-outlined" style="font-size:14px;">check</span>
@@ -34,6 +43,7 @@
               <td>{{ getCategoryName(movement.incomeCategoryId) }}</td>
               <td class="wrap">{{ movement.description ?? '—' }}</td>
               <td class="right">{{ formatCurrency(movement.amount) }}</td>
+              <td class="right" style="color:rgba(255,255,255,0.5);">—</td>
               <td>
                 <button class="row-action" (click)="editMovement(i)">
                   <span class="material-symbols-outlined" style="font-size:14px;">edit</span>
@@ -43,7 +53,7 @@
           }
         } @empty {
           <tr>
-            <td colspan="5" style="text-align:center; color:rgba(255,255,255,0.5);">No hay ingresos registrados</td>
+            <td colspan="6" style="text-align:center; color:rgba(255,255,255,0.5);">No hay ingresos registrados</td>
           </tr>
         }
       </tbody>

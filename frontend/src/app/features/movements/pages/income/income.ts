@@ -4,7 +4,8 @@ import { SidebarService } from '../../../../core/services/sidebar.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
-import { Periodo, Categoria } from '../../../../core/models/api.models';
+import { TratamientoFiscalService } from '../../../../core/services/tratamiento-fiscal.service';
+import { Periodo, Categoria, TratamientoFiscal } from '../../../../core/models/api.models';
 import { todayLocalISO } from '../../../../core/utils/date.util';
 
 @Component({
@@ -18,14 +19,16 @@ export class MovementsIncome implements OnInit {
   private readonly periodoService = inject(PeriodoService);
   private readonly categoriaService = inject(CategoriaService);
   private readonly movimientoService = inject(MovimientoService);
+  private readonly tratamientoFiscalService = inject(TratamientoFiscalService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   periodos: Periodo[] = [];
   categorias: Categoria[] = [];
+  tratamientos: TratamientoFiscal[] = [];
   selectedPeriodoId = '';
   selectedCategoriaId = '';
+  selectedTratamientoId = '';
   monto = 0;
-  impuestoPct = 5;
   descripcion = '';
   fecha = todayLocalISO();
   saveMessage = '';
@@ -38,12 +41,18 @@ export class MovementsIncome implements OnInit {
 
   private async loadData(): Promise<void> {
     try {
-      const [periodos, categorias] = await Promise.all([
+      const [periodos, categorias, tratamientos] = await Promise.all([
         this.periodoService.list(),
         this.categoriaService.listIncome(),
+        this.tratamientoFiscalService.list().catch(() => []),
       ]);
       this.periodos = periodos.filter((p) => p.status === 'ACTIVE');
       this.categorias = categorias;
+      this.tratamientos = tratamientos;
+
+      const defaultTreatment =
+        tratamientos.find((t) => t.rate === 0.05) ?? tratamientos[0];
+      this.selectedTratamientoId = defaultTreatment?.id ?? '';
 
       if (this.periodos.length > 0) {
         this.selectedPeriodoId = this.periodos[0].id;
@@ -58,8 +67,13 @@ export class MovementsIncome implements OnInit {
     return this.periodos.length > 0;
   }
 
+  get tratamientoSeleccionado(): TratamientoFiscal | undefined {
+    return this.tratamientos.find((t) => t.id === this.selectedTratamientoId);
+  }
+
   get retencion(): number {
-    return (this.monto * this.impuestoPct) / 100;
+    const rate = this.tratamientoSeleccionado?.rate ?? 0;
+    return this.monto * rate;
   }
 
   get montoNeto(): number {
@@ -88,6 +102,7 @@ export class MovementsIncome implements OnInit {
         incomeCategoryId: this.selectedCategoriaId,
         grossAmount: this.monto,
         retentionAmount: this.retencion,
+        taxTreatmentId: this.selectedTratamientoId || undefined,
         description: this.descripcion || undefined,
         date: this.fecha || undefined,
       });
