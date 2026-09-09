@@ -332,6 +332,9 @@ Debido a decisiones aprobadas por el usuario durante la Fase 6, la implementaci�
 
 Base: `http://localhost:3000/api/v1`
 
+> **Nomenclatura de la API (B1):** los endpoints usan nombres en español y camelCase. El diseño original proponía nombres en inglés; el mapeo es el siguiente:
+> `GET /objectives` (no `/goals`), `POST /objectives`, `PATCH /objectives/:id`; `GET /categories/income` (no `/income-categories`) y `GET /categories/expense` (no `/expense-categories`); `GET /periods/:periodId/budget/overruns` (excedentes de presupuesto). Respuestas devueltas envueltas en la clave del recurso: `{ usuario }`, `{ categoria }`, `{ movimiento }`, `{ periodo }`, `{ presupuesto }`, `{ overruns }`, `{ dashboard }`, `{ report }`, `{ auditoria }`, y listas en `{ categorias }`, `{ usuarios }`, `{ periodos }`, `{ roles }`, `{ asignaciones }`.
+
 ### Autenticación
 
 | Método | Ruta | Auth | Descripción |
