@@ -1,7 +1,7 @@
 # Fase 4 — Estado del proyecto y pendientes
 
 Documento de seguimiento del trabajo en la rama `phase-4`.
-Actualizado: 2026-09-08.
+Actualizado: 2026-09-09.
 
 ## 1. Estado general
 
@@ -9,7 +9,7 @@ Actualizado: 2026-09-08.
 - **Estructura:** `koinu/backend` (Node.js + Express + PostgreSQL) y `koinu/frontend` (Angular + TypeScript).
 - **Núcleo del MVP implementado** (periodos, movimientos, ingresos, gastos, presupuesto, objetivos, informes, autenticación y administración).
 - **Últimas verificaciones completas:**
-  - Backend: typecheck OK, **114/114 tests** (26 suites).
+  - Backend: typecheck OK, **123/123 tests** (27 suites).
   - Frontend: build OK, **77/77 tests** (10 archivos de specs).
 
 ## 2. Bloques completados (commitados)
@@ -25,6 +25,7 @@ Actualizado: 2026-09-08.
 | A2 | `8f11308` | Desviaciones por categoría y recomendaciones en reportes. |
 | A6 | `42c9581` | Clasificación de movimientos y prioridad de objetivos. |
 | A7 | `509eaa6` | Trazabilidad (auditoría) de movimientos y su UI en reportes. |
+| M2 | *(próximo commit)* | Validación de duplicados de categorías (unique case-insensitive por usuario) y guard idempotente en `createDefaultsForUser`. |
 
 Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `pnpm build` + `pnpm ng test --watch=false` (frontend).
 
@@ -36,6 +37,7 @@ Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `p
 | M1 — Creación de periodo | Crear un periodo lo pone en estado `ACTIVO` de forma directa (sin paso intermedio). |
 | A6 — Clasificación de movimientos | Gastos: `REGULAR`/`OCASIONAL` y `FIJO`/`VARIABLE`. Ingresos por esfuerzo: `ACTIVO`/`PASIVO`/`PORTAFOLIO`. Prioridad de objetivos: `ALTA`/`MEDIA`/`BAJA` (default `MEDIA`). |
 | A7 — Auditoría de movimientos | Alcance acotado a movimientos (`CREADO`/`MODIFICADO`/`ELIMINADO`), consultable por periodo vía API y en la página de reportes, escrita en la misma transacción de cada operación. |
+| M2 — Duplicados de categorías | Nombre de categoría único por usuario (case-insensitive); conflicto → `409 CATEGORY_ALREADY_EXISTS` (mismo patrón que `EMAIL_ALREADY_REGISTERED`/`BUDGET_ALREADY_EXISTS`); `createDefaultsForUser` idempotente (guarda `LOWER(existing.name) = LOWER(source.name)`). |
 
 > Nota: en `ANÁLISIS_DEL_SISTEMA.txt` la "auditoría avanzada" figura como *Fuera del MVP*; A7 se implementó por decisión del usuario con este alcance acotado.
 
@@ -45,7 +47,7 @@ Los siguientes bloques quedaron acordados en sesión pero **aún no se implement
 
 | Bloque | Estado | Notas |
 |--------|--------|-------|
-| M2 | pendiente | Requerimientos por transcribir al retomar. |
+| M2 | completado | Duplicados de categorías validados (409 `CATEGORY_ALREADY_EXISTS`) y defaults idempotentes. |
 | M3 | pendiente | Requerimientos por transcribir al retomar. |
 | M5 | pendiente | Requerimientos por transcribir al retomar. |
 | M6 | pendiente | Requerimientos por transcribir al retomar. |

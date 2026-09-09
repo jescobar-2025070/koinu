@@ -46,6 +46,17 @@ export class CategoriaGastoRepository {
     return result.rows[0] ? mapRow(result.rows[0]) : null;
   }
 
+  async findActiveByName(userId: string, name: string): Promise<CategoriaGasto | null> {
+    const result = await this.db.query<CategoriaRow>(
+      `SELECT id, user_id, name, is_default, is_active, created_at
+         FROM categorias_gasto
+        WHERE user_id = $1 AND is_active = TRUE AND LOWER(name) = LOWER($2)
+        LIMIT 1`,
+      [userId, name],
+    );
+    return result.rows[0] ? mapRow(result.rows[0]) : null;
+  }
+
   async create(data: { userId: string; name: string }): Promise<CategoriaGasto> {
     const result = await this.db.query<CategoriaRow>(
       `INSERT INTO categorias_gasto (user_id, name, is_default)
@@ -85,7 +96,7 @@ export class CategoriaGastoRepository {
         WHERE source.user_id IS NULL AND source.is_default = TRUE
           AND NOT EXISTS (
             SELECT 1 FROM categorias_gasto existing
-             WHERE existing.user_id = $1 AND existing.name = source.name
+             WHERE existing.user_id = $1 AND LOWER(existing.name) = LOWER(source.name)
           )`,
       [userId],
     );
