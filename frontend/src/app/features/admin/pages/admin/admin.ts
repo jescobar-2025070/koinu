@@ -5,7 +5,7 @@ import { AdminService } from '../../../../core/services/admin.service';
 import { SystemService } from '../../../../core/services/system.service';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { User } from '../../../../core/auth/auth.models';
-import { SystemHealth } from '../../../../core/models/api.models';
+import { AdminPeriod, SystemHealth } from '../../../../core/models/api.models';
 
 @Component({
   selector: 'app-admin',
@@ -21,9 +21,12 @@ export class Admin implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
 
   users: User[] = [];
+  periods: AdminPeriod[] = [];
   rolesModel = new Map<string, { ADMIN: boolean; USR: boolean }>();
   busy = new Map<string, boolean>();
   rowMsg = new Map<string, string>();
+  periodBusy = new Map<string, boolean>();
+  periodMsg = new Map<string, string>();
   loading = true;
   health: SystemHealth | null = null;
 
@@ -40,12 +43,14 @@ export class Admin implements OnInit {
 
   private async loadData(): Promise<void> {
     try {
-      const [users, health] = await Promise.all([
+      const [users, health, periods] = await Promise.all([
         this.adminService.listUsers(),
         this.systemService.health().catch(() => null),
+        this.adminService.listPeriods(),
       ]);
       this.users = users;
       this.health = health;
+      this.periods = periods;
       for (const u of users) {
         this.rolesModel.set(u.id, {
           ADMIN: u.roles.includes('ADMIN'),
@@ -182,6 +187,35 @@ export class Admin implements OnInit {
     } finally {
       this.setBusy(u.id, false);
       this.cdr.markForCheck();
+    }
+  }
+
+  canCancelPeriod(p: AdminPeriod): boolean {
+    return p.status === 'DRAFT' || p.status === 'ACTIVE';
+  }
+
+  async cancelPeriod(p: AdminPeriod): Promise<void> {
+    if (!window.confirm(`¿Cancelar el período "${p.name}" de ${p.userEmail}?`)) {
+      return;
+    }
+    this.periodBusy.set(p.id, true);
+    this.periodMsg.set(p.id, '');
+    try {
+      const updated = await this.adminService.cancelPeriod(p.id);
+      const index = this.periods.findIndex((x) => x.id === updated.id);
+      if (index >= 0) {
+        this.periods[index] = updated;
+      }
+      this.periodMsg.set(p.id, 'Período cancelado.');
+    } catch (e: any) {
+      this.periodMsg.set(p.id, e?.error?.error?.message || 'No se pudo cancelar el período.');
+    } finally {
+      this.periodBusy.set(p.id, false);
+      this.cdr.markForCheck();
+      setTimeout(() => {
+        this.periodMsg.delete(p.id);
+        this.cdr.markForCheck();
+      }, 4000);
     }
   }
 

@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
 import { User } from '../auth/auth.models';
+import { AdminPeriod } from '../models/api.models';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -38,5 +39,15 @@ export class AdminService {
 
   async resetPassword(id: string, password: string): Promise<void> {
     await firstValueFrom(this.api.post(`/users/${id}/reset-password`, { password }));
+  }
+
+  async listPeriods(): Promise<AdminPeriod[]> {
+    const res = await firstValueFrom(this.api.get<{ periodos: AdminPeriod[] }>('/admin/periods'));
+    return res.periodos;
+  }
+
+  async cancelPeriod(id: string): Promise<AdminPeriod> {
+    const res = await firstValueFrom(this.api.post<{ periodo: AdminPeriod }>(`/admin/periods/${id}/cancel`));
+    return res.periodo;
   }
 }

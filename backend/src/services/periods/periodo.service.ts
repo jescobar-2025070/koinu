@@ -20,6 +20,35 @@ export class PeriodoService {
     return this.periodoRepository.findActive(userId);
   }
 
+  async listForAdmin(): Promise<(Periodo & { userEmail: string })[]> {
+    return this.periodoRepository.findAllForAdmin();
+  }
+
+  async cancelForAdmin(id: string): Promise<Periodo> {
+    const periodo = await this.periodoRepository.findById(id);
+    if (!periodo) {
+      throw new AppError(ErrorCodes.NOT_FOUND, {
+        message: 'Período no encontrado.',
+        statusCode: 404,
+      });
+    }
+    if (periodo.status !== 'DRAFT' && periodo.status !== 'ACTIVE') {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'No se puede cancelar un período en su estado actual.',
+        statusCode: 400,
+      });
+    }
+
+    const cancelled = await this.periodoRepository.setStatus(id, 'CANCELLED');
+    if (!cancelled) {
+      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+        message: 'Error al cancelar el período.',
+        statusCode: 500,
+      });
+    }
+    return cancelled;
+  }
+
   async findById(id: string, userId: string): Promise<Periodo> {
     const periodo = await this.periodoRepository.findById(id);
     if (!periodo) {

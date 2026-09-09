@@ -71,6 +71,19 @@ export class PeriodoRepository {
     return result.rows.map(mapRow);
   }
 
+  async findAllForAdmin(): Promise<(Periodo & { userEmail: string })[]> {
+    const result = await this.db.query<PeriodoRow & { email: string }>(
+      `SELECT p.id, p.user_id, p.name, p.start_date, p.end_date, p.status,
+              p.created_at, p.updated_at, p.deleted_at, u.email AS email
+         FROM periodos p
+         JOIN users u ON u.id = p.user_id
+        WHERE p.deleted_at IS NULL
+        ORDER BY p.created_at DESC`,
+      [],
+    );
+    return result.rows.map((row) => ({ ...mapRow(row), userEmail: row.email }));
+  }
+
   async findActive(userId: string): Promise<Periodo | null> {
     const result = await this.db.query<PeriodoRow>(
       `SELECT id, user_id, name, start_date, end_date, status, created_at, updated_at, deleted_at

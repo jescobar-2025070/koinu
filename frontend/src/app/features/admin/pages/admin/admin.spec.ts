@@ -6,6 +6,7 @@ import { SystemService } from '../../../../core/services/system.service';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { User } from '../../../../core/auth/auth.models';
+import { AdminPeriod } from '../../../../core/models/api.models';
 
 const adminUser: User = {
   id: 'u-1',
@@ -48,9 +49,13 @@ describe('Admin', () => {
       setActive: vi.fn(),
       setRoles: vi.fn(),
       deleteUser: vi.fn(),
+      listPeriods: vi.fn(),
+      cancelPeriod: vi.fn(),
     };
     systemService = { health: vi.fn() };
     sidebarService = { setDashboard: vi.fn() } as Mock<SidebarService>;
+
+    adminService.listPeriods.mockResolvedValue([]);
 
     TestBed.configureTestingModule({
       imports: [Admin],
@@ -249,5 +254,72 @@ describe('Admin', () => {
 
     expect(adminService.resetPassword).toHaveBeenCalledWith('u-2', 'NuevaContrasena123');
     expect(component.rowMsg.get('u-2')).toContain('Contraseña restablecida');
+  });
+
+  it('carga la lista global de períodos con el correo del usuario', async () => {
+    const period = {
+      id: 'p-1',
+      userId: 'u-2',
+      userEmail: 'user@koinu.local',
+      name: 'Agosto 2026',
+      startDate: '2026-08-01T00:00:00.000Z',
+      endDate: '2026-08-31T00:00:00.000Z',
+      status: 'ACTIVE',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+      deletedAt: null,
+    };
+    adminService.listUsers.mockResolvedValue([]);
+    adminService.listPeriods.mockResolvedValue([period]);
+    systemService.health.mockResolvedValue(null);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    expect(component.periods).toEqual([period]);
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Agosto 2026');
+    expect(text).toContain('user@koinu.local');
+  });
+
+  it('canCancelPeriod solo permite DRAFT o ACTIVE', () => {
+    expect(component.canCancelPeriod({ status: 'ACTIVE' } as any)).toBe(true);
+    expect(component.canCancelPeriod({ status: 'DRAFT' } as any)).toBe(true);
+    expect(component.canCancelPeriod({ status: 'FINISHED' } as any)).toBe(false);
+    expect(component.canCancelPeriod({ status: 'CANCELLED' } as any)).toBe(false);
+  });
+
+  it('cancelPeriod no cancela si no se confirma', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    await component.cancelPeriod({ id: 'p-1', name: 'Agosto 2026' } as any);
+
+    expect(adminService.cancelPeriod).not.toHaveBeenCalled();
+  });
+
+  it('cancelPeriod cancela el período tras confirmar y actualiza la fila', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const active: AdminPeriod = {
+      id: 'p-1',
+      userId: 'u-2',
+      userEmail: 'user@koinu.local',
+      name: 'Agosto 2026',
+      startDate: '2026-08-01T00:00:00.000Z',
+      endDate: '2026-08-31T00:00:00.000Z',
+      status: 'ACTIVE',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+      deletedAt: null,
+    };
+    const cancelled = { ...active, status: 'CANCELLED' };
+    adminService.cancelPeriod.mockResolvedValue(cancelled);
+    component.periods = [active];
+
+    await component.cancelPeriod(active);
+
+    expect(adminService.cancelPeriod).toHaveBeenCalledWith('p-1');
+    expect(component.periods[0].status).toBe('CANCELLED');
+    expect(component.periodMsg.get('p-1')).toBe('Período cancelado.');
   });
 });

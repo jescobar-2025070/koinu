@@ -12,6 +12,10 @@ export interface Periodo {
   deletedAt: string | null;
 }
 
+export interface AdminPeriod extends Periodo {
+  userEmail: string;
+}
+
 export type MovimientoType = 'INCOME' | 'EXPENSE';
 
 export interface Movimiento {

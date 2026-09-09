@@ -97,4 +97,55 @@
       </table>
     }
   </div>
+<div class="glass-card admin__periods">
+    <h2 class="text-title-md">Gestión técnica de períodos</h2>
+    <p class="text-body-md text-on-surface-variant">Vista administrativa: sin acceso a la información financiera de los usuarios.</p>
+
+    @if (loading) {
+      <p class="text-body-md text-on-surface-variant">Cargando períodos…</p>
+    } @else if (periods.length === 0) {
+      <p class="text-body-md text-on-surface-variant">No hay períodos registrados.</p>
+    } @else {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>USUARIO</th>
+            <th>PERÍODO</th>
+            <th>INICIO</th>
+            <th>FIN</th>
+            <th>ESTADO</th>
+            <th>ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of periods; track p.id) {
+            <tr>
+              <td>{{ p.userEmail }}</td>
+              <td>{{ p.name }}</td>
+              <td>{{ formatDate(p.startDate) }}</td>
+              <td>{{ formatDate(p.endDate) }}</td>
+              <td>
+                <span class="chip"
+                  [class.chip--ok]="p.status === 'ACTIVE' || p.status === 'FINISHED'"
+                  [class.chip--off]="p.status === 'CANCELLED'">
+                  {{ p.status }}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <button class="btn-mini danger" (click)="cancelPeriod(p)"
+                  [disabled]="!canCancelPeriod(p) || !!periodBusy.get(p.id)">
+                  {{ canCancelPeriod(p) ? 'Cancelar' : '—' }}
+                </button>
+              </td>
+            </tr>
+            @if (periodMsg.get(p.id); as msg) {
+              <tr class="row-msg">
+                <td colspan="6">{{ msg }}</td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    }
+  </div>
 </section>
