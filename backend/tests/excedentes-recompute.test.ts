@@ -75,7 +75,7 @@ async function addExpense(agent: request.Agent, periodId: string, amount: number
 async function getOverruns(agent: request.Agent, periodId: string) {
   const res = await agent.get(`/api/v1/periods/${periodId}/budget/overruns`);
   assert.equal(res.status, 200);
-  return res.body;
+  return res.body.overruns;
 }
 
 describe('Reconciliación de excedentes (C3)', () => {
@@ -279,13 +279,16 @@ describe('Reconciliación de excedentes (C3)', () => {
 
       const res = await agent.get(`/api/v1/periods/${periodo.id}/dashboard`);
       assert.equal(res.status, 200);
-      assert.ok(res.body.presupuesto, 'esperaba presupuesto en el dashboard');
-      assert.equal(Number(res.body.presupuesto.excedenteTotal), 1000);
-      assert.equal(res.body.presupuesto.excedentes.length, 1);
-      assert.equal(res.body.presupuesto.excedentes[0].movimientoId, g2.body.movimiento.id);
-      assert.ok(res.body.presupuesto.excedentes[0].movimiento);
+      assert.ok(res.body.dashboard.presupuesto, 'esperaba presupuesto en el dashboard');
+      assert.equal(Number(res.body.dashboard.presupuesto.excedenteTotal), 1000);
+      assert.equal(res.body.dashboard.presupuesto.excedentes.length, 1);
       assert.equal(
-        Number(res.body.presupuesto.excedentes[0].movimiento.amount),
+        res.body.dashboard.presupuesto.excedentes[0].movimientoId,
+        g2.body.movimiento.id,
+      );
+      assert.ok(res.body.dashboard.presupuesto.excedentes[0].movimiento);
+      assert.equal(
+        Number(res.body.dashboard.presupuesto.excedentes[0].movimiento.amount),
         Number(g2.body.movimiento.amount),
       );
     });

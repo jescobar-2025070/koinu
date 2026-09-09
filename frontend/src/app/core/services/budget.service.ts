@@ -38,7 +38,7 @@ export class BudgetService {
 
   async getOverruns(periodoId: string): Promise<OverrunsData> {
     return await firstValueFrom(
-      this.api.get<OverrunsData>(`/periods/${periodoId}/budget/overruns`),
-    );
+      this.api.get<{ overruns: OverrunsData }>(`/periods/${periodoId}/budget/overruns`),
+    ).then((res) => res.overruns);
   }
 }

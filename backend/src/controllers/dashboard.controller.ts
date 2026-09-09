@@ -20,7 +20,7 @@ export class DashboardController {
       }
       const periodId = req.params.periodId;
       const dashboard = await this.dashboardService.getDashboard(req.user.id, periodId);
-      res.status(200).json(dashboard);
+      res.status(200).json({ dashboard });
     } catch (error) {
       next(error);
     }

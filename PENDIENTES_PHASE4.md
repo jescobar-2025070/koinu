@@ -28,6 +28,7 @@ Actualizado: 2026-09-09.
 | M2 | `7e3ddbf` | Validación de duplicados de categorías (unique case-insensitive por usuario) y guard idempotente en `createDefaultsForUser`. |
 | M3 | *(próximo commit)* | Origen del excedente: `getOverruns` y dashboard exponen el movimiento que generó cada excedente. |
 | M5 | *(próximo commit)* | Documentación de desviaciones (nomenclatura ES/EN, ACTIVE directo, presupuesto automático) en README y bitácora `ERRORES_Y_SOLUCIONES.md`. |
+| M6 | *(próximo commit)* | Higiene: DTOs de respuesta estandarizados (dashboard y overruns envueltos en clave) e invariantes con `ErrorCodes`. |
 
 Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `pnpm build` + `pnpm ng test --watch=false` (frontend).
 
@@ -42,6 +43,7 @@ Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `p
 | M2 — Duplicados de categorías | Nombre de categoría único por usuario (case-insensitive); conflicto → `409 CATEGORY_ALREADY_EXISTS` (mismo patrón que `EMAIL_ALREADY_REGISTERED`/`BUDGET_ALREADY_EXISTS`); `createDefaultsForUser` idempotente (guarda `LOWER(existing.name) = LOWER(source.name)`). |
 | M3 — Origen del excedente | `GET /periods/:id/budget/overruns` y el payload del dashboard incluyen, por cada excedente, el movimiento que lo generó (`movimiento.{id,date,amount,description,categoriaId,categoriaNombre}`) vía JOIN; en la UI se reemplaza la fecha del excedente por la del movimiento y se muestran CONCEPTO y CATEGORÍA (página Presupuesto y panel del dashboard). Además se normaliza `amount` de excedentes a número. |
 | M5 — Documentación de desviaciones | Se documentaron en `README.md` (sección "Desviaciones y decisiones documentadas") tres desviaciones aprobadas: nomenclatura ES/EN, creación de períodos directo en `ACTIVE` (sin DRAFT) y presupuesto total automático = ingresos netos. Además se actualizó la bitácora **externa** `~/finanzas/ERRORES_Y_SOLUCIONES.md` (fuera del repo, no va en el commit). |
+| M6 — Higiene (respuestas/DTOs/errores) | Convención: respuestas envueltas en clave nombrada de un recurso. Se estandarizó `GET /periods/:id/dashboard` → `{ dashboard }` y `GET /periods/:periodId/budget/overruns` → `{ overruns }`, actualizando los servicios frontend que las consumían; las invariantes de `detalle-ingreso` pasan de `throw new Error` (500) a `AppError(VALIDATION_ERROR, 400)`. El resto de errores ya usaba `ErrorCodes` (verificado en barrido). |
 
 > Nota: en `ANÁLISIS_DEL_SISTEMA.txt` la "auditoría avanzada" figura como *Fuera del MVP*; A7 se implementó por decisión del usuario con este alcance acotado.
 
@@ -55,6 +57,7 @@ Los siguientes bloques quedaron acordados en sesión pero **aún no se implement
 | M3 | completado | Excedentes con el movimiento que los originó en `getOverruns` y dashboard. |
 | M4 | pendiente | Requerimientos por transcribir al retomar (evaluación de alcance del vínculo movimientos↔objetivos). |
 | M5 | completado | Desviaciones documentadas en README y `ERRORES_Y_SOLUCIONES.md` (ES/EN, ACTIVE directo, presupuesto automático). |
+| M6 | completado | DTOs de dashboard y overruns envueltos (`{ dashboard }`, `{ overruns }`) y errores de `detalle-ingreso` via `AppError(VALIDATION_ERROR)`. |
 | M5 | pendiente | Requerimientos por transcribir al retomar. |
 | M6 | pendiente | Requerimientos por transcribir al retomar. |
 | B1 | pendiente | Requerimientos por transcribir al retomar. |
@@ -73,7 +76,7 @@ Alcance MVP aún cubierta parcialmente y candidata a asignarse a esos bloques (s
 ## 5. Retomar el trabajo
 
 1. Verificar estado actual: `git -C koinu status` y `git -C koinu log --oneline origin/phase-4..HEAD`.
-2. Obtener del usuario el detalle del siguiente bloque (M4, M6 o B*).
+2. Obtener del usuario el detalle del siguiente bloque (M4 o B*).
 3. Implementar bloque por bloque, con verificación (typecheck/test/build) y commit por bloque, en inglés.
 4. Actualizar este documento al cerrar cada bloque.
 5. Push a `origin/phase-4` cuando el usuario lo indique.

@@ -93,7 +93,7 @@ export class BudgetController {
     try {
       const userId = this.requireUser(req);
       const overruns = await this.budgetService.getOverruns(req.params.periodId, userId);
-      res.status(200).json(overruns);
+      res.status(200).json({ overruns });
     } catch (error) {
       next(error);
     }

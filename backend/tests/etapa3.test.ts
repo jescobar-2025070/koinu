@@ -307,9 +307,9 @@ describe('Etapa 3 - Dashboard', () => {
 
     const res = await agent.get(`/api/v1/periods/${p.id}/dashboard`);
     assert.equal(res.status, 200);
-    assert.equal(Number(res.body.totalIngresos), 1900);
-    assert.equal(Number(res.body.totalGastos), 0);
-    assert.equal(Number(res.body.disponible), 1900);
+    assert.equal(Number(res.body.dashboard.totalIngresos), 1900);
+    assert.equal(Number(res.body.dashboard.totalGastos), 0);
+    assert.equal(Number(res.body.dashboard.disponible), 1900);
   });
 
   it('requiere autenticación para el dashboard', async () => {

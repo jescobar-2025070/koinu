@@ -1,5 +1,7 @@
 import { Db } from '../config/db';
 import { DetalleIngreso } from '../entities/detalle-ingreso.entity';
+import { AppError } from '../errors/app-error';
+import { ErrorCodes } from '../errors/error-codes';
 
 interface DetalleRow {
   movement_id: string;
@@ -41,7 +43,10 @@ export class DetalleIngresoRepository {
     netAmount: number;
   }): Promise<DetalleIngreso> {
     if (data.netAmount !== data.grossAmount - data.retentionAmount) {
-      throw new Error('El monto neto debe ser igual a bruto - retención.');
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'El monto neto debe ser igual a bruto - retención.',
+        statusCode: 400,
+      });
     }
     const result = await this.db.query<DetalleRow>(
       `INSERT INTO detalles_ingreso (movement_id, tax_treatment_id, gross_amount, retention_amount, net_amount)
@@ -62,7 +67,10 @@ export class DetalleIngresoRepository {
     },
   ): Promise<DetalleIngreso | null> {
     if (data.netAmount !== data.grossAmount - data.retentionAmount) {
-      throw new Error('El monto neto debe ser igual a bruto - retención.');
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'El monto neto debe ser igual a bruto - retención.',
+        statusCode: 400,
+      });
     }
     const result = await this.db.query<DetalleRow>(
       `UPDATE detalles_ingreso
