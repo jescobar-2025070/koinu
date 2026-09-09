@@ -111,14 +111,18 @@
           <thead>
             <tr>
               <th>FECHA</th>
+              <th>CONCEPTO</th>
+              <th>CATEGORÍA</th>
               <th>MONTO</th>
             </tr>
           </thead>
           <tbody>
             @for (o of overruns; track o.id) {
               <tr>
-                <td>{{ formatDate(o.createdAt) }}</td>
-                <td>{{ formatCurrency(o.amount) }}</td>
+                <td>{{ formatDate(o.movimiento.date) }}</td>
+                <td>{{ o.movimiento.description || '—' }}</td>
+                <td>{{ o.movimiento.categoriaNombre || '—' }}</td>
+                <td class="negative">{{ formatCurrency(o.amount) }}</td>
               </tr>
             }
           </tbody>

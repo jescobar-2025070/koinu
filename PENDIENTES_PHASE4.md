@@ -9,8 +9,8 @@ Actualizado: 2026-09-09.
 - **Estructura:** `koinu/backend` (Node.js + Express + PostgreSQL) y `koinu/frontend` (Angular + TypeScript).
 - **Núcleo del MVP implementado** (periodos, movimientos, ingresos, gastos, presupuesto, objetivos, informes, autenticación y administración).
 - **Últimas verificaciones completas:**
-  - Backend: typecheck OK, **123/123 tests** (27 suites).
-  - Frontend: build OK, **77/77 tests** (10 archivos de specs).
+  - Backend: typecheck OK, **125/125 tests** (28 suites).
+  - Frontend: build OK, **80/80 tests** (11 archivos de specs).
 
 ## 2. Bloques completados (commitados)
 
@@ -25,7 +25,8 @@ Actualizado: 2026-09-09.
 | A2 | `8f11308` | Desviaciones por categoría y recomendaciones en reportes. |
 | A6 | `42c9581` | Clasificación de movimientos y prioridad de objetivos. |
 | A7 | `509eaa6` | Trazabilidad (auditoría) de movimientos y su UI en reportes. |
-| M2 | *(próximo commit)* | Validación de duplicados de categorías (unique case-insensitive por usuario) y guard idempotente en `createDefaultsForUser`. |
+| M2 | `7e3ddbf` | Validación de duplicados de categorías (unique case-insensitive por usuario) y guard idempotente en `createDefaultsForUser`. |
+| M3 | *(próximo commit)* | Origen del excedente: `getOverruns` y dashboard exponen el movimiento que generó cada excedente. |
 
 Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `pnpm build` + `pnpm ng test --watch=false` (frontend).
 
@@ -38,6 +39,7 @@ Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `p
 | A6 — Clasificación de movimientos | Gastos: `REGULAR`/`OCASIONAL` y `FIJO`/`VARIABLE`. Ingresos por esfuerzo: `ACTIVO`/`PASIVO`/`PORTAFOLIO`. Prioridad de objetivos: `ALTA`/`MEDIA`/`BAJA` (default `MEDIA`). |
 | A7 — Auditoría de movimientos | Alcance acotado a movimientos (`CREADO`/`MODIFICADO`/`ELIMINADO`), consultable por periodo vía API y en la página de reportes, escrita en la misma transacción de cada operación. |
 | M2 — Duplicados de categorías | Nombre de categoría único por usuario (case-insensitive); conflicto → `409 CATEGORY_ALREADY_EXISTS` (mismo patrón que `EMAIL_ALREADY_REGISTERED`/`BUDGET_ALREADY_EXISTS`); `createDefaultsForUser` idempotente (guarda `LOWER(existing.name) = LOWER(source.name)`). |
+| M3 — Origen del excedente | `GET /periods/:id/budget/overruns` y el payload del dashboard incluyen, por cada excedente, el movimiento que lo generó (`movimiento.{id,date,amount,description,categoriaId,categoriaNombre}`) vía JOIN; en la UI se reemplaza la fecha del excedente por la del movimiento y se muestran CONCEPTO y CATEGORÍA (página Presupuesto y panel del dashboard). Además se normaliza `amount` de excedentes a número. |
 
 > Nota: en `ANÁLISIS_DEL_SISTEMA.txt` la "auditoría avanzada" figura como *Fuera del MVP*; A7 se implementó por decisión del usuario con este alcance acotado.
 
@@ -48,7 +50,9 @@ Los siguientes bloques quedaron acordados en sesión pero **aún no se implement
 | Bloque | Estado | Notas |
 |--------|--------|-------|
 | M2 | completado | Duplicados de categorías validados (409 `CATEGORY_ALREADY_EXISTS`) y defaults idempotentes. |
-| M3 | pendiente | Requerimientos por transcribir al retomar. |
+| M3 | completado | Excedentes con el movimiento que los originó en `getOverruns` y dashboard. |
+| M4 | pendiente | Requerimientos por transcribir al retomar (evaluación de alcance del vínculo movimientos↔objetivos). |
+| M5 | pendiente | Requerimientos por transcribir al retomar. |
 | M5 | pendiente | Requerimientos por transcribir al retomar. |
 | M6 | pendiente | Requerimientos por transcribir al retomar. |
 | B1 | pendiente | Requerimientos por transcribir al retomar. |
@@ -67,7 +71,7 @@ Alcance MVP aún cubierta parcialmente y candidata a asignarse a esos bloques (s
 ## 5. Retomar el trabajo
 
 1. Verificar estado actual: `git -C koinu status` y `git -C koinu log --oneline origin/phase-4..HEAD`.
-2. Obtener del usuario el detalle del siguiente bloque (M2, M3, M5, M6 o B*).
+2. Obtener del usuario el detalle del siguiente bloque (M4, M5, M6 o B*).
 3. Implementar bloque por bloque, con verificación (typecheck/test/build) y commit por bloque, en inglés.
 4. Actualizar este documento al cerrar cada bloque.
 5. Push a `origin/phase-4` cuando el usuario lo indique.

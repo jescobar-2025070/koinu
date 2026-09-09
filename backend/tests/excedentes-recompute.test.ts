@@ -215,4 +215,79 @@ describe('Reconciliación de excedentes (C3)', () => {
     assert.equal(after.excedentes.length, 0);
     assert.equal(Number(after.excedenteTotal), 0);
   });
+
+  describe('M3 — Origen del excedente', () => {
+    it('expone el movimiento que generó cada excedente en getOverruns', async () => {
+      const { agent, email } = await registerAndGetAgent();
+      const periodo = await setupActivePeriod(agent, email);
+
+      const ingreso = await addIncome(agent, periodo.id, 5000);
+      assert.equal(ingreso.status, 201);
+
+      await agent.post(`/api/v1/periods/${periodo.id}/budget`);
+
+      const categorias = await agent.get('/api/v1/categories/expense');
+      const categoriaId = categorias.body.categorias[0].id;
+      const categoriaNombre = categorias.body.categorias[0].name;
+
+      const g1 = await agent.post('/api/v1/movements').send({
+        periodId: periodo.id,
+        type: 'EXPENSE',
+        expenseType: 'VARIABLE',
+        expenseCategoryId: categoriaId,
+        amount: 4000,
+        description: 'Renta de mayo',
+        date: '2027-05-10',
+      });
+      const g2 = await agent.post('/api/v1/movements').send({
+        periodId: periodo.id,
+        type: 'EXPENSE',
+        expenseType: 'VARIABLE',
+        expenseCategoryId: categoriaId,
+        amount: 2000,
+        description: 'Compra de emergencia',
+        date: '2027-05-12',
+      });
+      assert.equal(g1.status, 201);
+      assert.equal(g2.status, 201);
+
+      const overruns = await getOverruns(agent, periodo.id);
+      assert.equal(overruns.excedentes.length, 1);
+      const excedente = overruns.excedentes[0];
+      assert.equal(excedente.movimientoId, g2.body.movimiento.id);
+      assert.equal(excedente.movimiento.id, g2.body.movimiento.id);
+      assert.equal(excedente.movimiento.description, 'Compra de emergencia');
+      assert.equal(excedente.movimiento.categoriaId, categoriaId);
+      assert.equal(excedente.movimiento.categoriaNombre, categoriaNombre);
+      assert.equal(Number(excedente.movimiento.amount), 2000);
+      assert.equal(String(excedente.movimiento.date), String(g2.body.movimiento.date));
+    });
+
+    it('el dashboard incluye los excedentes con el movimiento que los generó', async () => {
+      const { agent, email } = await registerAndGetAgent();
+      const periodo = await setupActivePeriod(agent, email);
+
+      const ingreso = await addIncome(agent, periodo.id, 5000);
+      assert.equal(ingreso.status, 201);
+
+      await agent.post(`/api/v1/periods/${periodo.id}/budget`);
+
+      const g1 = await addExpense(agent, periodo.id, 4000);
+      const g2 = await addExpense(agent, periodo.id, 2000);
+      assert.equal(g1.status, 201);
+      assert.equal(g2.status, 201);
+
+      const res = await agent.get(`/api/v1/periods/${periodo.id}/dashboard`);
+      assert.equal(res.status, 200);
+      assert.ok(res.body.presupuesto, 'esperaba presupuesto en el dashboard');
+      assert.equal(Number(res.body.presupuesto.excedenteTotal), 1000);
+      assert.equal(res.body.presupuesto.excedentes.length, 1);
+      assert.equal(res.body.presupuesto.excedentes[0].movimientoId, g2.body.movimiento.id);
+      assert.ok(res.body.presupuesto.excedentes[0].movimiento);
+      assert.equal(
+        Number(res.body.presupuesto.excedentes[0].movimiento.amount),
+        Number(g2.body.movimiento.amount),
+      );
+    });
+  });
 });

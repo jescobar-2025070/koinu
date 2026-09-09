@@ -57,7 +57,8 @@ export class Dashboard implements OnInit {
     return 'Q ' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  private formatDate(date: Date): string {
+  formatDate(value: string | Date): string {
+    const date = typeof value === 'string' ? new Date(value) : value;
     const d = String(date.getDate()).padStart(2, '0');
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const y = date.getFullYear();

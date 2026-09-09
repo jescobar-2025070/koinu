@@ -8,6 +8,7 @@ import {
   AsignacionPresupuesto,
   BudgetData,
   Categoria,
+  ExcedentePresupuesto,
   Periodo,
 } from '../../../../core/models/api.models';
 
@@ -34,7 +35,7 @@ export class ObjectivesBudget implements OnInit {
   savingAllocation = false;
   allocationMsg = '';
 
-  overruns: { id: string; amount: number; createdAt: string }[] = [];
+  overruns: ExcedentePresupuesto[] = [];
   overrunsTotal = 0;
 
   ngOnInit(): void {
@@ -73,11 +74,7 @@ export class ObjectivesBudget implements OnInit {
       ]);
       this.budget = budget;
       this.overrunsTotal = overruns.excedenteTotal;
-      this.overruns = overruns.excedentes.map((e) => ({
-        id: e.id,
-        amount: e.amount,
-        createdAt: e.createdAt,
-      }));
+      this.overruns = overruns.excedentes;
       this.cdr.markForCheck();
     } catch (e) {
       console.error('Error loading budget:', e);

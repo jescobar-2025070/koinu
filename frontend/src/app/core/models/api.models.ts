@@ -89,12 +89,22 @@ export interface AsignacionPresupuesto {
   createdAt: string;
 }
 
+export interface ExcedenteMovimiento {
+  id: string;
+  date: string;
+  amount: number;
+  description: string | null;
+  categoriaId: string | null;
+  categoriaNombre: string | null;
+}
+
 export interface ExcedentePresupuesto {
   id: string;
   presupuestoId: string;
   movimientoId: string;
   amount: number;
   createdAt: string;
+  movimiento: ExcedenteMovimiento;
 }
 
 export interface BudgetData {
@@ -139,6 +149,7 @@ export interface DashboardData {
     totalAmount: number;
     asignadoTotal: number;
     excedenteTotal: number;
+    excedentes: ExcedentePresupuesto[];
     asignaciones: AsignacionPresupuesto[];
   } | null;
   disponiblePorPresupuesto: number | null;

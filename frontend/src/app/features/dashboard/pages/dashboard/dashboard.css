@@ -160,6 +160,27 @@ h2.welcome {
   color: #ff8a80;
 }
 
+.overrun-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 18px;
+}
+
+.overrun-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--text-dim2);
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.overrun-table td {
+  padding: 10px;
+  font-size: 0.88rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 @media (max-width: 768px) {
   .budget-stats {
     grid-template-columns: 1fr 1fr;

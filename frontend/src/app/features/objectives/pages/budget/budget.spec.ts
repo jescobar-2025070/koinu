@@ -73,7 +73,15 @@ const overruns: OverrunsData = {
       presupuestoId: 'b-1',
       movimientoId: 'm-1',
       amount: 300,
-      createdAt: '2026-01-10T12:00:00.000Z',
+      createdAt: '2026-01-20T12:00:00.000Z',
+      movimiento: {
+        id: 'm-1',
+        date: '2026-01-10',
+        amount: 2300,
+        description: 'Compra de emergencia',
+        categoriaId: 'c-1',
+        categoriaNombre: 'Alimentación',
+      },
     },
   ],
 };
@@ -212,6 +220,25 @@ describe('ObjectivesBudget', () => {
     expect(budgetService.createAllocation).toHaveBeenCalledWith('p-1', 'c-1', 1500);
     expect(component.allocationMsg).toBe('Asignación registrada.');
     expect(component.allocationAmount).toBe(0);
+  });
+
+  it('muestra el origen del movimiento en la tabla de excedentes', async () => {
+    periodoService.list.mockResolvedValue([periodo]);
+    categoriaService.listExpense.mockResolvedValue([categoria]);
+    budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
+    budgetService.getBudget.mockResolvedValue(budgetData);
+    budgetService.getOverruns.mockResolvedValue(overruns);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(component.overrunsTotal).toBe(300);
+    expect(text).toContain('Compra de emergencia');
+    expect(text).toContain('Alimentación');
+    expect(text).toContain(component.formatDate('2026-01-10'));
+    expect(text).not.toContain('20/01/2026');
   });
 
   it('deleteAllocation elimina la asignación', async () => {

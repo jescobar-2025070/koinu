@@ -34,4 +34,36 @@
       <div class="stat-value cyan">{{ periodEnd }}</div>
     </div>
   </div>
+
+  @if ((data?.presupuesto?.excedentes?.length ?? 0) > 0) {
+    <div class="budget-box">
+      <div class="budget-title">EXCEDENTES (SOBREPRESUPUESTO) POR MOVIMIENTO</div>
+      <div class="budget-stats">
+        <div>
+          <div class="stat-label">TOTAL EXCEDENTE</div>
+          <div class="stat-value negative">{{ formatCurrency(data?.presupuesto?.excedenteTotal ?? 0) }}</div>
+        </div>
+      </div>
+      <table class="overrun-table">
+        <thead>
+          <tr>
+            <th>FECHA</th>
+            <th>CONCEPTO</th>
+            <th>CATEGORÍA</th>
+            <th>MONTO</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (o of data?.presupuesto?.excedentes; track o.id) {
+            <tr>
+              <td>{{ formatDate(o.movimiento.date) }}</td>
+              <td>{{ o.movimiento.description || '—' }}</td>
+              <td>{{ o.movimiento.categoriaNombre || '—' }}</td>
+              <td class="negative">{{ formatCurrency(o.amount) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 }

@@ -3,7 +3,7 @@ import { AppError } from '../../errors/app-error';
 import { ErrorCodes } from '../../errors/error-codes';
 import { Presupuesto } from '../../entities/presupuesto.entity';
 import { AsignacionPresupuesto } from '../../entities/asignacion-presupuesto.entity';
-import { ExcedentePresupuesto } from '../../entities/excedente-presupuesto.entity';
+import { ExcedenteConMovimiento } from '../../entities/excedente-presupuesto.entity';
 import { PeriodoService } from '../periods/periodo.service';
 import { PresupuestoRepository } from '../../repositories/presupuesto.repository';
 import { AsignacionPresupuestoRepository } from '../../repositories/asignacion-presupuesto.repository';
@@ -248,7 +248,7 @@ export class BudgetService {
 
   async getOverruns(periodoId: string, userId: string): Promise<{
     excedenteTotal: number;
-    excedentes: ExcedentePresupuesto[];
+    excedentes: ExcedenteConMovimiento[];
   }> {
     await this.assertPeriodOwnership(periodoId, userId);
 
