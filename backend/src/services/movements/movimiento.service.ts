@@ -133,6 +133,9 @@ export class MovimientoService {
         netAmount: net,
       });
 
+      const budgetService = new BudgetService();
+      await budgetService.recomputeOverruns(client, periodoId);
+
       return { movimiento, detalle };
     });
   }
@@ -179,7 +182,7 @@ export class MovimientoService {
       });
 
       const budgetService = new BudgetService();
-      await budgetService.registerOverrun(client, periodoId, movimiento.id);
+      await budgetService.recomputeOverruns(client, periodoId);
 
       return { movimiento };
     });
@@ -221,13 +224,18 @@ export class MovimientoService {
       });
     }
 
-    const deleted = await this.movimientoRepository.delete(id);
-    if (!deleted) {
-      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
-        message: 'Error al eliminar el movimiento.',
-        statusCode: 500,
-      });
-    }
+    return withTransaction(async (client) => {
+      const movimientoRepo = new MovimientoRepository(client);
+      const deleted = await movimientoRepo.delete(id);
+      if (!deleted) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'Error al eliminar el movimiento.',
+          statusCode: 500,
+        });
+      }
+      const budgetService = new BudgetService();
+      await budgetService.recomputeOverruns(client, movimiento.periodoId);
+    });
   }
 
   async update(

@@ -56,4 +56,11 @@ export class ExcedentePresupuestoRepository {
     );
     return mapRow(result.rows[0]);
   }
+
+  async deleteByPresupuesto(presupuestoId: string): Promise<void> {
+    await this.db.query(
+      `DELETE FROM excedentes_presupuesto WHERE presupuesto_id = $1`,
+      [presupuestoId],
+    );
+  }
 }

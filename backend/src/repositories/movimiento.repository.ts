@@ -122,6 +122,23 @@ export class MovimientoRepository {
     };
   }
 
+  async findExpensesByPeriodo(periodoId: string): Promise<
+    { id: string; amount: number; createdAt: Date }[]
+  > {
+    const result = await this.db.query<{ id: string; amount: number; created_at: Date }>(
+      `SELECT id, amount, created_at
+         FROM movimientos
+        WHERE periodo_id = $1 AND type = 'EXPENSE' AND deleted_at IS NULL
+        ORDER BY created_at ASC`,
+      [periodoId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      amount: Number(row.amount),
+      createdAt: row.created_at,
+    }));
+  }
+
   async getCategoryBreakdown(periodoId: string): Promise<
     { categoryId: string | null; nombre: string; type: MovimientoType; total: number }[]
   > {

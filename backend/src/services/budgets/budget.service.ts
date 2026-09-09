@@ -227,11 +227,11 @@ export class BudgetService {
     };
   }
 
-  async registerOverrunIfNeeded(periodoId: string, movimientoId: string): Promise<void> {
-    return this.registerOverrun(pool, periodoId, movimientoId);
+  async recomputeOverrunsForPeriod(periodoId: string): Promise<void> {
+    return this.recomputeOverruns(pool, periodoId);
   }
 
-  async registerOverrun(db: Db, periodoId: string, movimientoId: string): Promise<void> {
+  async recomputeOverruns(db: Db, periodoId: string): Promise<void> {
     const presupuestoRepo = new PresupuestoRepository(db);
     const excedenteRepo = new ExcedentePresupuestoRepository(db);
     const movimientoRepo = new MovimientoRepository(db);
@@ -242,27 +242,26 @@ export class BudgetService {
     }
 
     const stats = await movimientoRepo.getStatsByPeriodo(periodoId);
-    const excedentes = await excedenteRepo.findByPresupuesto(presupuesto.id);
-    const yaRegistrado = excedentes.some((e) => e.movimientoId === movimientoId);
-    if (yaRegistrado) {
-      return;
+    const threshold = Number(stats.totalIngresos);
+    const gastos = await movimientoRepo.findExpensesByPeriodo(periodoId);
+
+    await excedenteRepo.deleteByPresupuesto(presupuesto.id);
+
+    let running = 0;
+    let prevOverrun = 0;
+    for (const gasto of gastos) {
+      running += Number(gasto.amount);
+      const currentOverrun = Math.max(0, running - threshold);
+      const incremento = currentOverrun - prevOverrun;
+      prevOverrun = currentOverrun;
+      if (incremento > 0) {
+        await excedenteRepo.create({
+          presupuestoId: presupuesto.id,
+          movimientoId: gasto.id,
+          amount: incremento,
+        });
+      }
     }
-
-    const sobrepasoPrevio = excedentes.reduce((sum, e) => sum + Number(e.amount), 0);
-    const incremento = Math.max(
-      0,
-      stats.totalGastos - Number(stats.totalIngresos) - sobrepasoPrevio,
-    );
-
-    if (incremento <= 0) {
-      return;
-    }
-
-    await excedenteRepo.create({
-      presupuestoId: presupuesto.id,
-      movimientoId,
-      amount: incremento,
-    });
   }
 
   private async assertPeriodOwnership(periodoId: string, userId: string): Promise<void> {
