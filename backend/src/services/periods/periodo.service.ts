@@ -49,6 +49,8 @@ export class PeriodoService {
       const active = await repo.findActive(userId);
       if (active) {
         await repo.setStatus(active.id, 'FINISHED');
+        const reportService = new ReportService(client);
+        await reportService.generateAndSaveSnapshot(client, active.id, userId);
       }
       return repo.create({
         userId,

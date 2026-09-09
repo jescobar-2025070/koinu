@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX uq_snapshots_informes_periodo ON snapshots_informes (periodo_id);

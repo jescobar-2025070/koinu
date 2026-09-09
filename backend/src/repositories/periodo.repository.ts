@@ -60,6 +60,17 @@ export class PeriodoRepository {
     return result.rows[0] ? mapRow(result.rows[0]) : null;
   }
 
+  async findByStatus(status: PeriodoStatus): Promise<Periodo[]> {
+    const result = await this.db.query<PeriodoRow>(
+      `SELECT id, user_id, name, start_date, end_date, status, created_at, updated_at, deleted_at
+         FROM periodos
+        WHERE status = $1 AND deleted_at IS NULL
+        ORDER BY start_date DESC`,
+      [status],
+    );
+    return result.rows.map(mapRow);
+  }
+
   async findActive(userId: string): Promise<Periodo | null> {
     const result = await this.db.query<PeriodoRow>(
       `SELECT id, user_id, name, start_date, end_date, status, created_at, updated_at, deleted_at
