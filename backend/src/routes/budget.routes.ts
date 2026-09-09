@@ -12,6 +12,7 @@ export function budgetRouter(): Router {
   const controller = new BudgetController();
 
   router.get('/:periodId/budget', authenticate, controller.getBudget);
+  router.post('/:periodId/budget', authenticate, controller.syncBudget);
 
   router.get('/:periodId/budget/allocations', authenticate, controller.listAllocations);
   router.post('/:periodId/budget/allocations', authenticate, validate(validateAllocationRequest), controller.createAllocation);

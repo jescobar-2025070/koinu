@@ -38,20 +38,18 @@ export class BudgetService {
   async getBudget(periodoId: string, userId: string): Promise<PresupuestoConAsignaciones> {
     await this.assertPeriodOwnership(periodoId, userId);
 
-    let presupuesto = await this.presupuestoRepository.findByPeriodo(periodoId);
-    const totalAmount = await this.netIncomeOf(periodoId);
-
-    if (!presupuesto) {
-      presupuesto = await this.presupuestoRepository.create({
-        periodoId,
-        totalAmount,
-      });
+    const presupuesto = await this.presupuestoRepository.findByPeriodo(periodoId);
+    if (presupuesto) {
+      presupuesto.totalAmount = await this.netIncomeOf(periodoId);
     }
-    presupuesto.totalAmount = totalAmount;
 
-    const asignaciones = await this.asignacionRepository.findByPresupuesto(presupuesto.id);
+    const asignaciones = presupuesto
+      ? await this.asignacionRepository.findByPresupuesto(presupuesto.id)
+      : [];
     const asignadoTotal = asignaciones.reduce((sum, a) => sum + Number(a.amount), 0);
-    const excedenteTotal = await this.excedenteRepository.findTotalByPresupuesto(presupuesto.id);
+    const excedenteTotal = presupuesto
+      ? await this.excedenteRepository.findTotalByPresupuesto(presupuesto.id)
+      : 0;
 
     return {
       presupuesto,
@@ -59,6 +57,45 @@ export class BudgetService {
       asignadoTotal,
       excedenteTotal,
     };
+  }
+
+  async syncBudget(periodoId: string, userId: string): Promise<Presupuesto> {
+    await this.assertPeriodOwnership(periodoId, userId);
+
+    const totalAmount = await this.netIncomeOf(periodoId);
+
+    return withTransaction(async (client) => {
+      const presupuestoRepo = new PresupuestoRepository(client);
+      const existing = await presupuestoRepo.findByPeriodo(periodoId);
+      if (existing) {
+        const updated = await presupuestoRepo.update(existing.id, totalAmount);
+        if (!updated) {
+          throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+            message: 'Error al actualizar el presupuesto.',
+            statusCode: 500,
+          });
+        }
+        return updated;
+      }
+
+      try {
+        return await presupuestoRepo.create({ periodoId, totalAmount });
+      } catch (error) {
+        const isDuplicate = typeof error === 'object' && error !== null && (error as any).code === '23505';
+        if (!isDuplicate) {
+          throw error;
+        }
+        const concurrent = await presupuestoRepo.findByPeriodo(periodoId);
+        if (!concurrent) {
+          throw error;
+        }
+        const updated = await presupuestoRepo.update(concurrent.id, totalAmount);
+        if (!updated) {
+          throw error;
+        }
+        return updated;
+      }
+    });
   }
 
   private async netIncomeOf(periodoId: string): Promise<number> {

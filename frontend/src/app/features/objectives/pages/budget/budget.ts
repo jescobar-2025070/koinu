@@ -66,6 +66,7 @@ export class ObjectivesBudget implements OnInit {
       return;
     }
     try {
+      await this.budgetService.createBudget(this.selectedPeriodId);
       const [budget, overruns] = await Promise.all([
         this.budgetService.getBudget(this.selectedPeriodId),
         this.budgetService.getOverruns(this.selectedPeriodId),

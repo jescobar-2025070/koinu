@@ -89,6 +89,7 @@ describe('ObjectivesBudget', () => {
   beforeEach(() => {
     budgetService = {
       getBudget: vi.fn(),
+      createBudget: vi.fn(),
       createAllocation: vi.fn(),
       updateAllocation: vi.fn(),
       deleteAllocation: vi.fn(),
@@ -116,6 +117,7 @@ describe('ObjectivesBudget', () => {
   it('carga períodos, activa el período ACTIVE y renderiza el total calculado', async () => {
     periodoService.list.mockResolvedValue([periodo]);
     categoriaService.listExpense.mockResolvedValue([categoria]);
+    budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
     budgetService.getBudget.mockResolvedValue(budgetData);
     budgetService.getOverruns.mockResolvedValue({ excedenteTotal: 0, excedentes: [] });
 
@@ -126,6 +128,8 @@ describe('ObjectivesBudget', () => {
     expect(component.selectedPeriodId).toBe('p-1');
     expect(component.budget).toEqual(budgetData);
     expect(sidebarService.setObjectives).toHaveBeenCalled();
+    expect(budgetService.createBudget).toHaveBeenCalledWith('p-1');
+    expect(budgetService.getBudget).toHaveBeenCalledWith('p-1');
 
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent;
@@ -137,6 +141,7 @@ describe('ObjectivesBudget', () => {
   it('no ofrece edición del total del presupuesto', async () => {
     periodoService.list.mockResolvedValue([periodo]);
     categoriaService.listExpense.mockResolvedValue([categoria]);
+    budgetService.createBudget.mockResolvedValue({ ...budgetData.presupuesto! });
     budgetService.getBudget.mockResolvedValue(budgetData);
     budgetService.getOverruns.mockResolvedValue({ excedenteTotal: 0, excedentes: [] });
 
@@ -192,6 +197,7 @@ describe('ObjectivesBudget', () => {
   it('addAllocation registra la asignación con valores válidos', async () => {
     periodoService.list.mockResolvedValue([periodo]);
     categoriaService.listExpense.mockResolvedValue([categoria]);
+    budgetService.createBudget.mockResolvedValue({ id: 'b-1', periodoId: 'p-1', totalAmount: 0, createdAt: '', updatedAt: '' });
     budgetService.getBudget.mockResolvedValue(noBudget);
     budgetService.getOverruns.mockResolvedValue({ excedenteTotal: 0, excedentes: [] });
     budgetService.createAllocation.mockResolvedValue({} as AsignacionPresupuesto);
