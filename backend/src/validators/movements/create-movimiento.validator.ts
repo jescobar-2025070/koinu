@@ -5,6 +5,7 @@ interface CreateMovimientoRequest {
   type: 'INCOME' | 'EXPENSE';
   incomeCategoryId?: string;
   expenseCategoryId?: string;
+  objetivoId?: string;
   grossAmount?: number;
   retentionAmount?: number;
   taxTreatmentId?: string;
@@ -23,6 +24,7 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
   const type = typeof data.type === 'string' ? data.type.trim().toUpperCase() : '';
   const incomeCategoryId = typeof data.incomeCategoryId === 'string' ? data.incomeCategoryId.trim() : undefined;
   const expenseCategoryId = typeof data.expenseCategoryId === 'string' ? data.expenseCategoryId.trim() : undefined;
+  const objetivoId = typeof data.objetivoId === 'string' ? data.objetivoId.trim() : undefined;
   const taxTreatmentId = typeof data.taxTreatmentId === 'string' ? data.taxTreatmentId.trim() : undefined;
   const incomeClassification = typeof data.incomeClassification === 'string' ? data.incomeClassification.trim().toUpperCase() : '';
   const expenseType = typeof data.expenseType === 'string' ? data.expenseType.trim().toUpperCase() : '';
@@ -70,6 +72,9 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
     if (isNaN(amount) || amount <= 0) {
       errors.amount = 'El monto debe ser un número mayor a 0.';
     }
+    if (objetivoId) {
+      errors.objetivoId = 'Solo los ingresos pueden aportar a un objetivo.';
+    }
   }
 
   if (description !== undefined && description.length > 500) {
@@ -89,6 +94,7 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
     type: type as 'INCOME' | 'EXPENSE',
     incomeCategoryId,
     expenseCategoryId,
+    objetivoId: type === 'INCOME' ? objetivoId : undefined,
     grossAmount: type === 'INCOME' ? grossAmount : undefined,
     retentionAmount: type === 'INCOME' ? retentionAmount : undefined,
     taxTreatmentId,

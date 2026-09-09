@@ -220,6 +220,17 @@ export class ObjetivoRepository {
     return result.rows[0] ? mapRow(result.rows[0]) : null;
   }
 
+  async adjust(id: string, delta: number): Promise<Objetivo | null> {
+    const result = await this.db.query<ObjetivoRow>(
+      `UPDATE objetivos
+          SET current_amount = current_amount + $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING ${COLUMNS}`,
+      [delta, id],
+    );
+    return result.rows[0] ? mapRow(result.rows[0]) : null;
+  }
+
   async delete(id: string): Promise<boolean> {
     const result = await this.db.query(
       `DELETE FROM objetivos WHERE id = $1`,

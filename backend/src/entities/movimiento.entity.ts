@@ -9,6 +9,7 @@ export interface Movimiento {
   type: MovimientoType;
   incomeCategoryId: string | null;
   expenseCategoryId: string | null;
+  objetivoId: string | null;
   amount: number;
   description: string | null;
   incomeClassification: IncomeClassification | null;

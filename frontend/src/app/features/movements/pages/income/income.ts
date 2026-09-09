@@ -5,7 +5,8 @@ import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
 import { TratamientoFiscalService } from '../../../../core/services/tratamiento-fiscal.service';
-import { Periodo, Categoria, TratamientoFiscal, IncomeClassification } from '../../../../core/models/api.models';
+import { ObjetivoService } from '../../../../core/services/objetivo.service';
+import { Periodo, Categoria, TratamientoFiscal, IncomeClassification, Objetivo } from '../../../../core/models/api.models';
 import { todayLocalISO } from '../../../../core/utils/date.util';
 
 @Component({
@@ -20,15 +21,18 @@ export class MovementsIncome implements OnInit {
   private readonly categoriaService = inject(CategoriaService);
   private readonly movimientoService = inject(MovimientoService);
   private readonly tratamientoFiscalService = inject(TratamientoFiscalService);
+  private readonly objetivoService = inject(ObjetivoService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   periodos: Periodo[] = [];
   categorias: Categoria[] = [];
   tratamientos: TratamientoFiscal[] = [];
+  objetivos: Objetivo[] = [];
   selectedPeriodoId = '';
   selectedCategoriaId = '';
   selectedTratamientoId = '';
   selectedClasificacion: IncomeClassification = 'REGULAR';
+  selectedObjetivoId = '';
   monto = 0;
   descripcion = '';
   fecha = todayLocalISO();
@@ -42,14 +46,16 @@ export class MovementsIncome implements OnInit {
 
   private async loadData(): Promise<void> {
     try {
-      const [periodos, categorias, tratamientos] = await Promise.all([
+      const [periodos, categorias, tratamientos, objetivos] = await Promise.all([
         this.periodoService.list(),
         this.categoriaService.listIncome(),
         this.tratamientoFiscalService.list().catch(() => []),
+        this.objetivoService.list().catch(() => []),
       ]);
       this.periodos = periodos.filter((p) => p.status === 'ACTIVE');
       this.categorias = categorias;
       this.tratamientos = tratamientos;
+      this.objetivos = objetivos.filter((o) => o.status === 'ACTIVE');
 
       const defaultTreatment =
         tratamientos.find((t) => t.rate === 0.05) ?? tratamientos[0];
@@ -101,6 +107,7 @@ export class MovementsIncome implements OnInit {
         periodId: this.selectedPeriodoId,
         type: 'INCOME',
         incomeCategoryId: this.selectedCategoriaId,
+        objetivoId: this.selectedObjetivoId || undefined,
         grossAmount: this.monto,
         retentionAmount: this.retencion,
         taxTreatmentId: this.selectedTratamientoId || undefined,

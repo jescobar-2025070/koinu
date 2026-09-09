@@ -14,6 +14,7 @@ import { MovimientoAuditoriaRepository } from '../../repositories/movimiento-aud
 import { DetalleIngresoRepository } from '../../repositories/detalle-ingreso.repository';
 import { CategoriaIngresoRepository } from '../../repositories/categoria-ingreso.repository';
 import { CategoriaGastoRepository } from '../../repositories/categoria-gasto.repository';
+import { ObjetivoRepository } from '../../repositories/objetivo.repository';
 import { BudgetService } from '../budgets/budget.service';
 
 export interface CrearMovimientoInput {
@@ -21,6 +22,7 @@ export interface CrearMovimientoInput {
   type: MovimientoType;
   incomeCategoryId?: string;
   expenseCategoryId?: string;
+  objetivoId?: string;
   grossAmount?: number;
   retentionAmount?: number;
   taxTreatmentId?: string;
@@ -111,6 +113,11 @@ export class MovimientoService {
       });
     }
 
+    const objetivoId = this.normalizeObjetivoId(data.objetivoId);
+    if (objetivoId) {
+      await this.assertObjetivoElegible(objetivoId, userId);
+    }
+
     const gross = data.grossAmount ?? data.amount;
     if (typeof gross !== 'number' || isNaN(gross) || gross <= 0) {
       throw new AppError(ErrorCodes.VALIDATION_ERROR, {
@@ -136,11 +143,16 @@ export class MovimientoService {
         periodoId,
         type: 'INCOME',
         incomeCategoryId: data.incomeCategoryId,
+        objetivoId: objetivoId ?? null,
         amount: net,
         description: data.description,
         incomeClassification: data.incomeClassification,
         date: fecha,
       });
+
+      if (objetivoId) {
+        await this.adjustObjetivo(client, objetivoId, net);
+      }
 
       const detalle = await detalleRepo.create({
         movementId: movimiento.id,
@@ -172,12 +184,19 @@ export class MovimientoService {
     });
   }
 
-  private async createGasto(
+  async createGasto(
     userId: string,
     data: CrearMovimientoInput,
     periodoId: string,
     fecha: Date,
   ): Promise<{ movimiento: Movimiento }> {
+    if (this.normalizeObjetivoId(data.objetivoId)) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'Solo los ingresos pueden aportar a un objetivo.',
+        statusCode: 400,
+      });
+    }
+
     if (!data.expenseCategoryId) {
       throw new AppError(ErrorCodes.VALIDATION_ERROR, {
         message: 'La categoría de gasto es obligatoria.',
@@ -283,6 +302,9 @@ export class MovimientoService {
           statusCode: 500,
         });
       }
+      if (movimiento.objetivoId) {
+        await this.adjustObjetivo(client, movimiento.objetivoId, -Number(movimiento.amount));
+      }
       await this.logAuditoria(client, {
         movimientoId: movimiento.id,
         periodoId: movimiento.periodoId,
@@ -309,6 +331,7 @@ export class MovimientoService {
       taxTreatmentId?: string;
       incomeClassification?: IncomeClassification;
       expenseType?: ExpenseType;
+      objetivoId?: string | null;
     },
   ): Promise<Movimiento> {
     const movimiento = await this.movimientoRepository.findById(id);
@@ -366,6 +389,7 @@ export class MovimientoService {
       retentionAmount?: number;
       taxTreatmentId?: string;
       incomeClassification?: IncomeClassification;
+      objetivoId?: string | null;
     },
     fecha: Date | undefined,
   ): Promise<Movimiento> {
@@ -373,6 +397,15 @@ export class MovimientoService {
       const movimientoRepo = new MovimientoRepository(client);
       const detalleRepo = new DetalleIngresoRepository(client);
       const detalle = await detalleRepo.findById(movimiento.id);
+      const oldObjetivoId = movimiento.objetivoId;
+      const oldNet = Number(movimiento.amount);
+
+      const objetivoId = data.objetivoId !== undefined
+        ? this.normalizeObjetivoId(data.objetivoId)
+        : movimiento.objetivoId;
+      if (objetivoId) {
+        await this.assertObjetivoElegible(objetivoId, movimiento.userId);
+      }
 
       const gross = data.grossAmount ?? data.amount ?? Number(detalle?.grossAmount ?? 0);
       if (typeof gross !== 'number' || isNaN(gross) || gross <= 0) {
@@ -410,8 +443,9 @@ export class MovimientoService {
         amount: number;
         description?: string;
         incomeClassification?: IncomeClassification;
+        objetivoId?: string | null;
         date?: Date;
-      } = { amount: net };
+      } = { amount: net, objetivoId };
       if (data.description !== undefined) {
         payload.description = data.description;
       }
@@ -435,6 +469,20 @@ export class MovimientoService {
           statusCode: 500,
         });
       }
+
+      if (objetivoId === oldObjetivoId) {
+        if (objetivoId && net !== oldNet) {
+          await this.adjustObjetivo(client, objetivoId, net - oldNet);
+        }
+      } else {
+        if (oldObjetivoId) {
+          await this.adjustObjetivo(client, oldObjetivoId, -oldNet);
+        }
+        if (objetivoId) {
+          await this.adjustObjetivo(client, objetivoId, net);
+        }
+      }
+
       await this.logAuditoria(client, {
         movimientoId: movimiento.id,
         periodoId: movimiento.periodoId,
@@ -455,9 +503,16 @@ export class MovimientoService {
       description?: string;
       date?: string;
       expenseType?: ExpenseType;
+      objetivoId?: string | null;
     },
     fecha: Date | undefined,
   ): Promise<Movimiento> {
+    if (this.normalizeObjetivoId(data.objetivoId)) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'Solo los ingresos pueden aportar a un objetivo.',
+        statusCode: 400,
+      });
+    }
     const payload: {
       amount?: number;
       description?: string;
@@ -523,6 +578,7 @@ export class MovimientoService {
         description: movement.description ?? null,
         date: movement.date,
         incomeClassification: movement.incomeClassification ?? null,
+        objetivoId: movement.objetivoId ?? null,
       };
     }
     return {
@@ -531,6 +587,7 @@ export class MovimientoService {
       description: movement.description ?? null,
       date: movement.date,
       expenseType: movement.expenseType ?? null,
+      objetivoId: movement.objetivoId ?? null,
     };
   }
 
@@ -560,5 +617,47 @@ export class MovimientoService {
   ): Promise<void> {
     const auditoriaRepo = new MovimientoAuditoriaRepository(client);
     await auditoriaRepo.create(entry);
+  }
+
+  private normalizeObjetivoId(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const trimmed = String(value).trim();
+    return trimmed || null;
+  }
+
+  private async assertObjetivoElegible(objetivoId: string, userId: string): Promise<void> {
+    const objetivoRepo = new ObjetivoRepository(pool);
+    const objetivo = await objetivoRepo.findById(objetivoId);
+    if (!objetivo) {
+      throw new AppError(ErrorCodes.NOT_FOUND, {
+        message: 'Objetivo no encontrado.',
+        statusCode: 404,
+      });
+    }
+    if (objetivo.userId !== userId) {
+      throw new AppError(ErrorCodes.FORBIDDEN, {
+        message: 'No tienes acceso a este objetivo.',
+        statusCode: 403,
+      });
+    }
+    if (objetivo.status !== 'ACTIVE') {
+      throw new AppError(ErrorCodes.GOAL_NOT_ACTIVE, {
+        message: 'Solo los objetivos activos aceptan aportes automáticos.',
+        statusCode: 422,
+      });
+    }
+  }
+
+  private async adjustObjetivo(client: Db, objetivoId: string, delta: number): Promise<void> {
+    const objetivoRepo = new ObjetivoRepository(client);
+    const ajustado = await objetivoRepo.adjust(objetivoId, delta);
+    if (!ajustado) {
+      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+        message: 'Error al actualizar el objetivo vinculado.',
+        statusCode: 500,
+      });
+    }
   }
 }

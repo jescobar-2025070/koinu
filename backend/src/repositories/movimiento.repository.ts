@@ -13,6 +13,7 @@ interface MovimientoRow {
   type: MovimientoType;
   income_category_id: string | null;
   expense_category_id: string | null;
+  objetivo_id: string | null;
   amount: number;
   description: string | null;
   income_classification: IncomeClassification | null;
@@ -31,6 +32,7 @@ function mapRow(row: MovimientoRow): Movimiento {
     type: row.type,
     incomeCategoryId: row.income_category_id,
     expenseCategoryId: row.expense_category_id,
+    objetivoId: row.objetivo_id,
     amount: row.amount,
     description: row.description,
     incomeClassification: row.income_classification,
@@ -42,7 +44,7 @@ function mapRow(row: MovimientoRow): Movimiento {
   };
 }
 
-const COLUMNS = `id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, income_classification, expense_type, date, created_at, updated_at, deleted_at`;
+const COLUMNS = `id, user_id, periodo_id, type, income_category_id, expense_category_id, objetivo_id, amount, description, income_classification, expense_type, date, created_at, updated_at, deleted_at`;
 
 interface MovimientoCreateData {
   userId: string;
@@ -50,6 +52,7 @@ interface MovimientoCreateData {
   type: MovimientoType;
   incomeCategoryId?: string | null;
   expenseCategoryId?: string | null;
+  objetivoId?: string | null;
   amount: number;
   description?: string;
   incomeClassification?: IncomeClassification | null;
@@ -184,8 +187,8 @@ export class MovimientoRepository {
 
   async create(data: MovimientoCreateData): Promise<Movimiento> {
     const result = await this.db.query<MovimientoRow>(
-      `INSERT INTO movimientos (user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, income_classification, expense_type, date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO movimientos (user_id, periodo_id, type, income_category_id, expense_category_id, objetivo_id, amount, description, income_classification, expense_type, date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING ${COLUMNS}`,
       [
         data.userId,
@@ -193,6 +196,7 @@ export class MovimientoRepository {
         data.type,
         data.incomeCategoryId ?? null,
         data.expenseCategoryId ?? null,
+        data.objetivoId ?? null,
         data.amount,
         data.description ?? null,
         data.incomeClassification ?? null,
@@ -218,6 +222,7 @@ export class MovimientoRepository {
       description?: string;
       incomeClassification?: import('../entities/movimiento.entity').IncomeClassification | null;
       expenseType?: import('../entities/movimiento.entity').ExpenseType | null;
+      objetivoId?: string | null;
       date?: Date;
     },
   ): Promise<Movimiento | null> {
@@ -238,6 +243,10 @@ export class MovimientoRepository {
     if (data.expenseType !== undefined) {
       params.push(data.expenseType);
       updates.push(`expense_type = $${params.length}`);
+    }
+    if (data.objetivoId !== undefined) {
+      params.push(data.objetivoId);
+      updates.push(`objetivo_id = $${params.length}`);
     }
     if (data.date !== undefined) {
       params.push(data.date);

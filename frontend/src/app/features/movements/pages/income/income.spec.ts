@@ -6,6 +6,7 @@ import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
 import { TratamientoFiscalService } from '../../../../core/services/tratamiento-fiscal.service';
+import { ObjetivoService } from '../../../../core/services/objetivo.service';
 import { Categoria, Periodo, TratamientoFiscal } from '../../../../core/models/api.models';
 
 const periodo: Periodo = {
@@ -53,6 +54,7 @@ describe('MovementsIncome', () => {
   let categoriaService: Mock<CategoriaService>;
   let movimientoService: Mock<MovimientoService>;
   let tratamientoFiscalService: Mock<TratamientoFiscalService>;
+  let objetivoService: Mock<ObjetivoService>;
   let sidebarService: Mock<SidebarService>;
 
   beforeEach(() => {
@@ -67,6 +69,18 @@ describe('MovementsIncome', () => {
       stats: vi.fn(),
     };
     tratamientoFiscalService = { list: vi.fn() } as Mock<TratamientoFiscalService>;
+    objetivoService = {
+      list: vi.fn(),
+      listByPeriod: vi.fn(),
+      create: vi.fn(),
+      createByPeriod: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deposit: vi.fn(),
+      withdraw: vi.fn(),
+      complete: vi.fn(),
+      cancel: vi.fn(),
+    };
     sidebarService = { setMovements: vi.fn() } as Mock<SidebarService>;
 
     TestBed.configureTestingModule({
@@ -78,6 +92,7 @@ describe('MovementsIncome', () => {
         { provide: CategoriaService, useValue: categoriaService },
         { provide: MovimientoService, useValue: movimientoService },
         { provide: TratamientoFiscalService, useValue: tratamientoFiscalService },
+        { provide: ObjetivoService, useValue: objetivoService },
       ],
     });
 
@@ -89,6 +104,7 @@ describe('MovementsIncome', () => {
     periodoService.list.mockResolvedValue([periodo]);
     categoriaService.listIncome.mockResolvedValue([categoria]);
     tratamientoFiscalService.list.mockResolvedValue([tratamiento]);
+    objetivoService.list.mockResolvedValue([]);
     movimientoService.create.mockResolvedValue({ movimiento: {} as never });
 
     fixture.detectChanges();
@@ -115,6 +131,7 @@ describe('MovementsIncome', () => {
     periodoService.list.mockResolvedValue([periodo]);
     categoriaService.listIncome.mockResolvedValue([categoria]);
     tratamientoFiscalService.list.mockResolvedValue([tratamiento]);
+    objetivoService.list.mockResolvedValue([]);
 
     fixture.detectChanges();
     await settle();

@@ -18,6 +18,7 @@ export class MovimientoService {
     type: 'INCOME' | 'EXPENSE';
     incomeCategoryId?: string;
     expenseCategoryId?: string;
+    objetivoId?: string;
     grossAmount?: number;
     retentionAmount?: number;
     taxTreatmentId?: string;
@@ -51,6 +52,7 @@ export class MovimientoService {
       taxTreatmentId?: string;
       incomeClassification?: IncomeClassification;
       expenseType?: ExpenseType;
+      objetivoId?: string | null;
     },
   ): Promise<Movimiento> {
     const res = await firstValueFrom(this.api.put<{ movimiento: Movimiento }>(`/movements/${id}`, data));

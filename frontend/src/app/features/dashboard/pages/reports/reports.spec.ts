@@ -64,6 +64,7 @@ const movimiento: Movimiento = {
   type: 'EXPENSE',
   incomeCategoryId: null,
   expenseCategoryId: 'c-1',
+  objetivoId: null,
   amount: 1500,
   description: 'Despensa',
   incomeClassification: null,
