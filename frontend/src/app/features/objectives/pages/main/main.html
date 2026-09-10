@@ -7,6 +7,7 @@
       Nuevo Objetivo
     </button>
   </div>
+  <div class="save-msg">{{ actionMsg }}</div>
 
   @if (showForm) {
     <div class="objetivo-form">
@@ -72,10 +73,10 @@
               <button class="row-action" (click)="openTransaction(obj, 'WITHDRAW')" title="Retirar">
                 <span class="material-symbols-outlined" style="font-size:14px;">remove</span>
               </button>
-              <button class="row-action" (click)="completeObjetivo(obj.id)" title="Completar">
+              <button class="row-action" (click)="completeObjetivo(obj)" title="Completar">
                 <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>
               </button>
-              <button class="row-action" (click)="cancelObjetivo(obj.id)" title="Cancelar">
+              <button class="row-action" (click)="cancelObjetivo(obj)" title="Cancelar">
                 <span class="material-symbols-outlined" style="font-size:14px;">cancel</span>
               </button>
             }

@@ -129,4 +129,77 @@ describe('ObjectivesMain', () => {
   it('formatDate devuelve guion cuando no hay fecha', () => {
     expect(component.formatDate(null)).toBe('—');
   });
+
+  it('completeObjetivo pide confirmación, completa y muestra el mensaje', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    objetivoService.list.mockResolvedValue([objetivo]);
+    periodoService.list.mockResolvedValue([periodo]);
+    objetivoService.complete.mockResolvedValue({ ...objetivo, status: 'COMPLETED' });
+
+    fixture.detectChanges();
+    await settle();
+
+    await component.completeObjetivo(objetivo);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(objetivoService.complete).toHaveBeenCalledWith('o-1');
+    expect(component.actionMsg).toBe('Objetivo completado.');
+    confirmSpy.mockRestore();
+  });
+
+  it('completeObjetivo no llama al servicio si se cancela la confirmación', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    await component.completeObjetivo(objetivo);
+
+    expect(objetivoService.complete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('cancelObjetivo pide confirmación, cancela y muestra el mensaje', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    objetivoService.list.mockResolvedValue([objetivo]);
+    periodoService.list.mockResolvedValue([periodo]);
+    objetivoService.cancel.mockResolvedValue({ ...objetivo, status: 'CANCELLED' });
+
+    fixture.detectChanges();
+    await settle();
+
+    await component.cancelObjetivo(objetivo);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(objetivoService.cancel).toHaveBeenCalledWith('o-1');
+    expect(component.actionMsg).toBe('Objetivo cancelado.');
+    confirmSpy.mockRestore();
+  });
+
+  it('completeObjetivo muestra el mensaje de error del servidor', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    objetivoService.complete.mockRejectedValue({
+      error: { error: { message: 'El objetivo no está activo. Solo los objetivos activos aceptan operaciones.' } },
+    });
+
+    await component.completeObjetivo(objetivo);
+
+    expect(component.actionMsg).toContain('El objetivo no está activo');
+    confirmSpy.mockRestore();
+  });
+
+  it('renderiza las etiquetas de estado ACTIVO, COMPLETADO y CANCELADO', async () => {
+    objetivoService.list.mockResolvedValue([
+      objetivo,
+      { ...objetivo, id: 'o-2', name: 'Meta cumplida', status: 'COMPLETED' },
+      { ...objetivo, id: 'o-3', name: 'Meta cancelada', status: 'CANCELLED' },
+    ]);
+    periodoService.list.mockResolvedValue([periodo]);
+
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('ACTIVO');
+    expect(text).toContain('COMPLETADO');
+    expect(text).toContain('CANCELADO');
+  });
 });

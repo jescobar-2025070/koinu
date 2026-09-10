@@ -406,13 +406,14 @@ Base: `http://localhost:3000/api/v1`
 | Método | Ruta | Auth | Descripción |
 | --- | --- | --- | --- |
 | `GET` | `/objectives` | Sí | Listar objetivos |
-| `POST` | `/objectives` | Sí | Crear objetivo (`name`, `targetAmount`, `currentAmount?`, `periodId?`, `deadline?`, `description?`) |
-| `PUT` | `/objectives/:id` | Sí | Modificar objetivo |
+| `POST` | `/objectives` | Sí | Crear objetivo (`name`, `targetAmount`, `currentAmount?`, `periodId?`, `deadline?`, `description?`, `priority?`) |
+| `GET` | `/objectives/:id` | Sí | Obtener objetivo por id |
+| `PATCH` | `/objectives/:id` | Sí | Modificar objetivo (`name`, `description`, `targetAmount`, `deadline`, `startDate`, `periodId`, `priority`; no acepta `status`) |
 | `DELETE` | `/objectives/:id` | Sí | Eliminar objetivo |
-| `POST` | `/objectives/:id/deposit` | Sí | Contribuir al objetivo (monto) |
-| `POST` | `/objectives/:id/withdraw` | Sí | Retirar del objetivo (monto) |
-| `POST` | `/objectives/:id/complete` | Sí | Marcar como completado |
-| `POST` | `/objectives/:id/cancel` | Sí | Cancelar objetivo |
+| `POST` | `/objectives/:id/contributions` | Sí | Depositar en el objetivo (solo `ACTIVE`; 422 `GOAL_NOT_ACTIVE` si no lo está) |
+| `POST` | `/objectives/:id/withdrawals` | Sí | Retirar del objetivo (solo `ACTIVE`) |
+| `POST` | `/objectives/:id/complete` | Sí | Marcar como COMPLETADO (solo `ACTIVE`; sin retorno a ACTIVO) |
+| `POST` | `/objectives/:id/cancel` | Sí | Cancelar objetivo (solo `ACTIVE`; sin retorno a ACTIVO) |
 
 ### Categorías
 

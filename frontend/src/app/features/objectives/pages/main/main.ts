@@ -31,6 +31,7 @@ export class ObjectivesMain implements OnInit {
   ];
   saving = false;
   saveMessage = '';
+  actionMsg = '';
   transaccion: { id: string; amount: number; tipo: 'DEPOSIT' | 'WITHDRAW' } | null = null;
   transactionMsg = '';
 
@@ -166,21 +167,37 @@ export class ObjectivesMain implements OnInit {
     }
   }
 
-  async completeObjetivo(id: string): Promise<void> {
+  async completeObjetivo(o: Objetivo): Promise<void> {
+    const confirmed = window.confirm(`¿Marcar "${o.name}" como COMPLETADO? Esta acción no se puede deshacer.`);
+    if (!confirmed) {
+      return;
+    }
+    this.actionMsg = '';
     try {
-      await this.objetivoService.complete(id);
+      await this.objetivoService.complete(o.id);
+      this.actionMsg = 'Objetivo completado.';
       await this.loadData();
-    } catch (e) {
-      console.error('Error completing objective:', e);
+    } catch (e: any) {
+      this.actionMsg = e?.error?.error?.message || 'No se pudo completar el objetivo.';
+    } finally {
+      this.cdr.markForCheck();
     }
   }
 
-  async cancelObjetivo(id: string): Promise<void> {
+  async cancelObjetivo(o: Objetivo): Promise<void> {
+    const confirmed = window.confirm(`¿Cancelar "${o.name}"? Esta acción no se puede deshacer.`);
+    if (!confirmed) {
+      return;
+    }
+    this.actionMsg = '';
     try {
-      await this.objetivoService.cancel(id);
+      await this.objetivoService.cancel(o.id);
+      this.actionMsg = 'Objetivo cancelado.';
       await this.loadData();
-    } catch (e) {
-      console.error('Error cancelling objective:', e);
+    } catch (e: any) {
+      this.actionMsg = e?.error?.error?.message || 'No se pudo cancelar el objetivo.';
+    } finally {
+      this.cdr.markForCheck();
     }
   }
 

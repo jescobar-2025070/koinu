@@ -9,8 +9,8 @@ Actualizado: 2026-09-09.
 - **Estructura:** `koinu/backend` (Node.js + Express + PostgreSQL) y `koinu/frontend` (Angular + TypeScript).
 - **Núcleo del MVP implementado** (periodos, movimientos, ingresos, gastos, presupuesto, objetivos, informes, autenticación y administración).
 - **Últimas verificaciones completas:**
-  - Backend: typecheck OK, **147/147 tests** (30 suites).
-  - Frontend: build OK, **85/85 tests** (11 archivos de specs).
+  - Backend: typecheck OK, **158/158 tests** (31 suites).
+  - Frontend: build OK, **90/90 tests** (11 archivos de specs).
 
 ## 2. Bloques completados (commitados)
 
@@ -32,7 +32,8 @@ Actualizado: 2026-09-09.
 | M6 | `7116f4d` | Higiene: DTOs de respuesta estandarizados (dashboard y overruns envueltos en clave) e invariantes con `ErrorCodes`. |
 | B1 | `4b6fdfa` | Documentación en README (sección API) de la nomenclatura de endpoints (español/camelCase, mapeo EN→ES) y de las respuestas envueltas en clave de recurso. |
 | B2 | `021760c` | Notas documentales sobre código inerte detectado en el sistema actual, en `NOTAS_CODIGO_INERTE.md` (rama DRAFT de períodos/M1, `RoleResponse` sin usar, endpoints y métodos frontend sin consumidor, scripts de mantenimiento). Bajo riesgo: documentación únicamente, sin cambios de funcionamiento. |
-| B3 | *(este commit)* | Gestión de excedentes — redistribución presupuestaria: la propuesta se calcula prorrateando el excedente entre las asignaciones existentes (método del resto mayor, en centavos) y queda limitada a la holgura disponible (total = ingresos netos − asignado). Endpoints `GET /periods/:id/budget/redistribution` (`{ redistribution }`, motivos `SIN_PRESUPUESTO/SIN_EXCEDENTE/SIN_HOLGURA/SIN_ASIGNACIONES`) y `POST /periods/:id/budget/redistribute` (aplica aumentos en transacción, revalidando; 422 `BUDGET_REDISTRIBUTION_NOT_AVAILABLE` si no hay excedente/holgura/asignaciones). UI: panel "Redistribución de excedentes" en la página Presupuesto con tabla de propuesta (actual → propuesto → incremento) y confirmación antes de aplicar. Tests: 10 backend + 5 frontend. |
+| B3 | `cfde16e` | Gestión de excedentes — redistribución presupuestaria: la propuesta se calcula prorrateando el excedente entre las asignaciones existentes (método del resto mayor, en centavos) y queda limitada a la holgura disponible (total = ingresos netos − asignado). Endpoints `GET /periods/:id/budget/redistribution` (`{ redistribution }`, motivos `SIN_PRESUPUESTO/SIN_EXCEDENTE/SIN_HOLGURA/SIN_ASIGNACIONES`) y `POST /periods/:id/budget/redistribute` (aplica aumentos en transacción, revalidando; 422 `BUDGET_REDISTRIBUTION_NOT_AVAILABLE` si no hay excedente/holgura/asignaciones). UI: panel "Redistribución de excedentes" en la página Presupuesto con tabla de propuesta (actual → propuesto → incremento) y confirmación antes de aplicar. Tests: 10 backend + 5 frontend. |
+| B4 | *(este commit)* | Marcar objetivos como COMPLETADO/CANCELADO: el flujo backend (`POST /objectives/:id/complete|/cancel`) ya existía; este bloque lo consolida con confirmación en la UI (diálogo antes de completar/cancelar, mensaje de éxito/error con feedback del servidor) y cobertura de pruebas: 11 tests backend de transiciones unidireccionales ACTIVE → COMPLETED/CANCELLED (persistencia, doble operación → 422 `GOAL_NOT_ACTIVE`, 403 ajeno, 404 inexistente, aislamiento de aportes/retiros e ingresos vinculados) y 5 tests frontend (confirmación, cancelación, error y etiquetas ACTIVO/COMPLETADO/CANCELADO). Se corrigió además la tabla de endpoints de objetivos en README (PATCH y rutas reales `contributions`/`withdrawals`). Sin retorno a ACTIVO. |
 
 Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `pnpm build` + `pnpm ng test --watch=false` (frontend).
 
@@ -50,6 +51,7 @@ Flujo de verificación por bloque: `pnpm typecheck` + `pnpm test` (backend) y `p
 | M6 — Higiene (respuestas/DTOs/errores) | Convención: respuestas envueltas en clave nombrada de un recurso. Se estandarizó `GET /periods/:id/dashboard` → `{ dashboard }` y `GET /periods/:periodId/budget/overruns` → `{ overruns }`, actualizando los servicios frontend que las consumían; las invariantes de `detalle-ingreso` pasan de `throw new Error` (500) a `AppError(VALIDATION_ERROR, 400)`. El resto de errores ya usaba `ErrorCodes` (verificado en barrido). |
 | M4 — Vínculo movimientos↔objetivos | Alcance decidido: aporte automático desde movimiento marcado. `movimientos.objetivo_id` (nullable, solo `INCOME` vía CHECK), `ON DELETE SET NULL`. Al crear/editar/eliminar un ingreso vinculado, `current_amount` del objetivo se ajusta en la misma transacción (crear: +neto; editar monto: delta; re-vincular: revierte el anterior y suma al nuevo; desvincular/eliminar: revierte el neto). Solo objetivos activos del propio usuario; objetivo inexistente → 404, ajeno → 403, no activo → 422 `GOAL_NOT_ACTIVE`. UI: select "Aporta a objetivo" en registro y edición de ingresos + columna OBJETIVO en el historial. |
 | B3 — Redistribución de excedentes | La propuesta prorratea el excedente (`montoARedistribuir = min(excedenteTotal, holgura)`) entre las asignaciones existentes con el método del resto mayor en centavos (la suma de incrementos cuadra exacta). Sin presupuesto → `SIN_PRESUPUESTO`; sin excedente → `SIN_EXCEDENTE`; sin holgura (asignado = total) → `SIN_HOLGURA`; sin asignaciones → `SIN_ASIGNACIONES`. `POST /budget/redistribute` aplica los aumentos en transacción revalidando la propuesta (evita carreras) y exige confirmación en la UI. Fuera de alcance: modificar `current_amount` de objetivos y auditoría de la redistribución. |
+| B4 — Estados de objetivos | Marcado unidireccional ACTIVE → COMPLETED/CANCELLED: `POST /objectives/:id/complete|/cancel` solo desde `ACTIVE` (422 `GOAL_NOT_ACTIVE` en otro caso); no existe retorno a ACTIVO. Las operaciones de aporte (contributions), retiro (withdrawals) y el vínculo de ingresos (`objetivoId`) se rechazan en objetivos no activos. `PATCH /objectives/:id` no acepta `status` y se mantiene editable (metadatos) tras completar/cancelar, por decisión de alcance. La UI pide confirmación antes de completar/cancelar y muestra el mensaje de resultado/error del servidor; los objetivos no activos ocultan los botones de operación y no aparecen en los selectores de ingreso (solo `ACTIVE`). |
 
 > Nota: en `ANÁLISIS_DEL_SISTEMA.txt` la "auditoría avanzada" figura como *Fuera del MVP*; A7 se implementó por decisión del usuario con este alcance acotado.
 
@@ -63,7 +65,7 @@ Los siguientes bloques quedaron acordados en sesión pero **aún no se implement
 | B1 | completado | Nomenclatura de endpoints y respuestas documentada en README (sección API). |
 | B2 | completado | Notas documentales DRAFT sobre código inerte detectado, en `NOTAS_CODIGO_INERTE.md` (ver §2 y §3). |
 | B3 | completado | Redistribución de excedentes entre asignaciones (ver §2). |
-| B4 | pendiente | Requerimientos por transcribir al retomar. |
+| B4 | completado | Objetivos completados/cancelados con confirmación y cobertura de tests (ver §2 y §3). |
 | B5 | pendiente | Requerimientos por transcribir al retomar. |
 
 Alcance MVP aún cubierta parcialmente y candidata a asignarse a esos bloques (según `Planificación del Proyecto.pdf` / `ANÁLISIS_DEL_SISTEMA.txt`):
