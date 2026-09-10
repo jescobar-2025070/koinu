@@ -591,7 +591,7 @@ El backend calcula el monto neto (`net = gross - retention`) y lo guarda en `mov
 | `/periods` | Períodos | Stats + gráfico de barras |
 | `/periods/new` | Nuevo período | Formulario (año, mes) |
 | `/periods/edit` | Modificar período | Formulario editable del período abierto |
-| `/periods/finalize` | Finalizar período | Resumen readonly + botón finalizar |
+| `/periods/finalize` | Finalizar período | Resumen readonly del período ACTIVE + confirmación; al finalizar sugiere crear un nuevo período o ver el historial |
 | `/periods/history` | Historial | Tabla de todos los períodos |
 | `/movements` | Nuevo ingreso | Formulario con cálculo de retención |
 | `/movements/expenses` | Nuevo gasto | Formulario con selección de categoría |
