@@ -41,4 +41,5 @@ pnpm-lock.yaml
 e2e/
 backend/scripts/e2e-prepare.ts
 backend/tests/
+backend/package.json
 frontend/**/*.spec.ts
