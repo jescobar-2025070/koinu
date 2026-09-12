@@ -147,13 +147,20 @@ export class ObjetivoService {
 
   async delete(id: string, userId: string): Promise<void> {
     const objetivo = await this.assertOwned(id, userId);
-    const deleted = await this.objetivoRepository.delete(objetivo.id);
-    if (!deleted) {
-      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
-        message: 'Error al eliminar el objetivo.',
-        statusCode: 500,
-      });
-    }
+
+    await withTransaction(async (client) => {
+      const objetivoRepo = new ObjetivoRepository(client);
+      const movimientoRepo = new MovimientoRepository(client);
+
+      await movimientoRepo.deleteByObjetivoId(objetivo.id);
+      const deleted = await objetivoRepo.delete(objetivo.id);
+      if (!deleted) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'Error al eliminar el objetivo.',
+          statusCode: 500,
+        });
+      }
+    });
   }
 
   async deposit(id: string, userId: string, amount: number): Promise<Objetivo> {

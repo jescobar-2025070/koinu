@@ -233,6 +233,14 @@ export class MovimientoRepository {
     return result.rowCount !== null && result.rowCount > 0;
   }
 
+  async deleteByObjetivoId(objetivoId: string): Promise<number> {
+    const result = await this.db.query(
+      `DELETE FROM movimientos WHERE objetivo_id = $1`,
+      [objetivoId],
+    );
+    return result.rowCount ?? 0;
+  }
+
   async update(
     id: string,
     data: {
