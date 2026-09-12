@@ -2,10 +2,11 @@ import { Component, inject, OnInit } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { AuthService } from './core/auth/auth.service';
 import { SidebarService } from './core/services/sidebar.service';
+import { AlertDialog } from './shared/components/alert-dialog/alert-dialog';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AlertDialog],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })

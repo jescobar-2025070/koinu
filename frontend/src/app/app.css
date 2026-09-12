@@ -213,6 +213,16 @@
   color: var(--text-dim);
 }
 
+.profile-card > div {
+  min-width: 0;
+}
+
+.profile-name,
+.profile-email {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /* ============================================================
    Main Panel - glass container
    ============================================================ */

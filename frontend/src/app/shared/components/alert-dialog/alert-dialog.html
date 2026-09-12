@@ -1,0 +1,34 @@
+@if (dialog()) {
+  <div class="dialog-overlay" (click)="onOverlayClick()">
+    <div class="dialog-box" (click)="$event.stopPropagation()">
+      @if (title()) {
+        <div class="dialog-title">{{ title() }}</div>
+      }
+
+      <div class="dialog-message">{{ message() }}</div>
+
+      @if (!isConfirm()) {
+        <label class="dialog-label">{{ promptLabel() }}</label>
+        <input
+          class="glow-pill dialog-input"
+          [ngModel]="promptValue()"
+          (ngModelChange)="promptValue.set($event)"
+          (keydown.enter)="submitPrompt()"
+          autofocus
+        />
+      }
+
+      <div class="dialog-actions">
+        <button type="button" class="btn-secondary" (click)="cancel()">{{ cancelLabel() }}</button>
+        <button
+          type="button"
+          class="btn-primary"
+          [class.btn-danger]="isConfirm() && dangerous()"
+          (click)="isConfirm() ? confirm() : submitPrompt()"
+        >
+          {{ confirmLabel() }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
