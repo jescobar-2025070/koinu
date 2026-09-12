@@ -128,10 +128,6 @@ export class DashboardReports implements OnInit {
     return this.report?.presupuesto?.asignado ?? 0;
   }
 
-  get presupuestoExcedente(): number {
-    return this.report?.presupuesto?.excedente ?? 0;
-  }
-
   get expenseRows(): ReportCategoryRow[] {
     return this.report?.porCategoria.filter((r) => r.tipo === 'EXPENSE') ?? [];
   }

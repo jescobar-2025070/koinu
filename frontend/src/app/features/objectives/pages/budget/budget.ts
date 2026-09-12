@@ -4,13 +4,14 @@ import { SidebarService } from '../../../../core/services/sidebar.service';
 import { BudgetService } from '../../../../core/services/budget.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
+import { MovimientoService } from '../../../../core/services/movimiento.service';
+import { DialogService } from '../../../../core/services/dialog.service';
 import {
   AsignacionPresupuesto,
   BudgetData,
   Categoria,
-  ExcedentePresupuesto,
+  Movimiento,
   Periodo,
-  RedistribucionPropuesta,
 } from '../../../../core/models/api.models';
 
 @Component({
@@ -24,24 +25,20 @@ export class ObjectivesBudget implements OnInit {
   private readonly budgetService = inject(BudgetService);
   private readonly periodoService = inject(PeriodoService);
   private readonly categoriaService = inject(CategoriaService);
+  private readonly movimientoService = inject(MovimientoService);
+  private readonly dialogService = inject(DialogService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   periodos: Periodo[] = [];
   selectedPeriodId = '';
   budget: BudgetData | null = null;
+  movements: Movimiento[] = [];
 
   categoriasGasto: Categoria[] = [];
   allocationCategoryId = '';
   allocationAmount = 0;
   savingAllocation = false;
   allocationMsg = '';
-
-  overruns: ExcedentePresupuesto[] = [];
-  overrunsTotal = 0;
-
-  redistribution: RedistribucionPropuesta | null = null;
-  redistributing = false;
-  redistributionMsg = '';
 
   ngOnInit(): void {
     this.sidebarService.setObjectives();
@@ -62,10 +59,7 @@ export class ObjectivesBudget implements OnInit {
 
   selectPeriod(): void {
     this.budget = null;
-    this.overruns = [];
     this.allocationMsg = '';
-    this.redistribution = null;
-    this.redistributionMsg = '';
     void this.loadBudget();
   }
 
@@ -75,15 +69,8 @@ export class ObjectivesBudget implements OnInit {
     }
     try {
       await this.budgetService.createBudget(this.selectedPeriodId);
-      const [budget, overruns, redistribution] = await Promise.all([
-        this.budgetService.getBudget(this.selectedPeriodId),
-        this.budgetService.getOverruns(this.selectedPeriodId),
-        this.budgetService.getRedistribution(this.selectedPeriodId),
-      ]);
-      this.budget = budget;
-      this.overrunsTotal = overruns.excedenteTotal;
-      this.overruns = overruns.excedentes;
-      this.redistribution = redistribution;
+      this.budget = await this.budgetService.getBudget(this.selectedPeriodId);
+      this.movements = await this.movimientoService.list(this.selectedPeriodId);
       this.cdr.markForCheck();
     } catch (e) {
       console.error('Error loading budget:', e);
@@ -103,6 +90,16 @@ export class ObjectivesBudget implements OnInit {
     return this.budget && this.budget.presupuesto
       ? Number(this.budget.presupuesto.totalAmount) - this.budget.asignadoTotal
       : 0;
+  }
+
+  consumedByCategory(categoriaGastoId: string): number {
+    return this.movements
+      .filter((m) => m.type === 'EXPENSE' && m.expenseCategoryId === categoriaGastoId)
+      .reduce((sum, m) => sum + Number(m.amount), 0);
+  }
+
+  remainingOf(a: AsignacionPresupuesto): number {
+    return Number(a.amount) - this.consumedByCategory(a.categoriaGastoId);
   }
 
   async addAllocation(): Promise<void> {
@@ -130,13 +127,25 @@ export class ObjectivesBudget implements OnInit {
   }
 
   async updateAllocation(a: AsignacionPresupuesto): Promise<void> {
-    const next = window.prompt('Nuevo monto (Q):', String(a.amount));
-    const parsed = parseFloat(next ?? '');
+    const next = await this.dialogService.prompt({
+      title: 'EDITAR MONTO ASIGNADO',
+      message: `Categoría: ${this.getCategoryName(a.categoriaGastoId)}`,
+      label: 'Nuevo monto (Q)',
+      value: String(a.amount),
+      confirmLabel: 'Guardar',
+    });
+    if (next === null) {
+      return;
+    }
+    const parsed = parseFloat(next);
     if (isNaN(parsed) || parsed <= 0) {
+      this.allocationMsg = 'El monto debe ser un número mayor a 0.';
+      this.cdr.markForCheck();
       return;
     }
     try {
       await this.budgetService.updateAllocation(a.id, parsed);
+      this.allocationMsg = 'Asignación actualizada.';
       await this.loadBudget();
     } catch (e: any) {
       this.allocationMsg = e?.error?.error?.message || 'No se pudo actualizar la asignación.';
@@ -154,53 +163,9 @@ export class ObjectivesBudget implements OnInit {
     }
   }
 
-  redistributionMotivoText(): string {
-    switch (this.redistribution?.motivo) {
-      case 'SIN_PRESUPUESTO':
-        return 'El presupuesto aún no está definido para este período.';
-      case 'SIN_EXCEDENTE':
-        return 'No hay excedentes de gasto sobre el presupuesto para redistribuir.';
-      case 'SIN_HOLGURA':
-        return 'Ya has asignado todo el presupuesto; no queda holgura disponible.';
-      case 'SIN_ASIGNACIONES':
-        return 'Agrega asignaciones por categoría para poder redistribuir.';
-      default:
-        return '';
-    }
-  }
-
-  async applyRedistribution(): Promise<void> {
-    if (!this.selectedPeriodId || !this.redistribution?.redistribuible) {
-      return;
-    }
-    const confirmed = window.confirm(
-      `¿Aplicar la redistribución de ${this.formatCurrency(this.redistribution.montoARedistribuir)} a las asignaciones? Esta acción no se puede deshacer.`,
-    );
-    if (!confirmed) {
-      return;
-    }
-    this.redistributing = true;
-    this.redistributionMsg = '';
-    try {
-      await this.budgetService.applyRedistribution(this.selectedPeriodId);
-      this.redistributionMsg = 'Redistribución aplicada.';
-      await this.loadBudget();
-    } catch (e: any) {
-      this.redistributionMsg = e?.error?.error?.message || 'No se pudo aplicar la redistribución.';
-    } finally {
-      this.redistributing = false;
-      this.cdr.markForCheck();
-    }
-  }
-
   formatCurrency(amount: number): string {
     return (
       'Q ' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     );
-  }
-
-  formatDate(dateStr: string): string {
-    const d = new Date(dateStr);
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   }
 }

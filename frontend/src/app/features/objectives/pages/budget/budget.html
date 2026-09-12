@@ -40,10 +40,6 @@
             <span class="stat-label">PENDIENTE</span>
             <span class="stat-value">{{ formatCurrency(totalDisponible()) }}</span>
           </div>
-          <div class="summary-item">
-            <span class="stat-label">EXCEDENTE</span>
-            <span class="stat-value" [class.negative]="budget!.excedenteTotal > 0">{{ formatCurrency(budget!.excedenteTotal) }}</span>
-          </div>
         </div>
 
         <div class="allocation-form">
@@ -72,6 +68,8 @@
               <tr>
                 <th>CATEGORÍA</th>
                 <th>MONTO</th>
+                <th>CONSUMIDO</th>
+                <th>REMANENTE</th>
                 <th></th>
               </tr>
             </thead>
@@ -80,6 +78,8 @@
                 <tr>
                   <td>{{ getCategoryName(a.categoriaGastoId) }}</td>
                   <td>{{ formatCurrency(a.amount) }}</td>
+                  <td>{{ formatCurrency(consumedByCategory(a.categoriaGastoId)) }}</td>
+                  <td>{{ formatCurrency(remainingOf(a)) }}</td>
                   <td class="table-actions">
                     <button class="row-action" (click)="updateAllocation(a)" title="Editar monto">
                       <span class="material-symbols-outlined" style="font-size:14px;">edit</span>
@@ -97,96 +97,5 @@
         }
       </div>
     }
-
-    <div class="panel">
-      <div class="panel-title">EXCEDENTES (SOBREPRESUPUESTO)</div>
-      <div class="summary-row">
-        <div class="summary-item">
-          <span class="stat-label">TOTAL EXCEDENTE</span>
-          <span class="stat-value" [class.negative]="overrunsTotal > 0">{{ formatCurrency(overrunsTotal) }}</span>
-        </div>
-      </div>
-      @if (overruns.length > 0) {
-        <table class="budget-table">
-          <thead>
-            <tr>
-              <th>FECHA</th>
-              <th>CONCEPTO</th>
-              <th>CATEGORÍA</th>
-              <th>MONTO</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (o of overruns; track o.id) {
-              <tr>
-                <td>{{ formatDate(o.movimiento.date) }}</td>
-                <td>{{ o.movimiento.description || '—' }}</td>
-                <td>{{ o.movimiento.categoriaNombre || '—' }}</td>
-                <td class="negative">{{ formatCurrency(o.amount) }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      } @else {
-        <div class="budget-empty">Sin excedentes hasta ahora: tus gastos están dentro del presupuesto.</div>
-      }
-    </div>
-
-    <div class="panel">
-      <div class="panel-title">REDISTRIBUCIÓN DE EXCEDENTES</div>
-      @if (redistribution?.redistribuible) {
-        <div class="summary-row">
-          <div class="summary-item">
-            <span class="stat-label">EXCEDENTE TOTAL</span>
-            <span class="stat-value negative">{{ formatCurrency(redistribution!.excedenteTotal) }}</span>
-          </div>
-          <div class="summary-item">
-            <span class="stat-label">HOLGURA DISPONIBLE</span>
-            <span class="stat-value">{{ formatCurrency(redistribution!.holgura) }}</span>
-          </div>
-          <div class="summary-item">
-            <span class="stat-label">A REDISTRIBUIR</span>
-            <span class="stat-value cyan">{{ formatCurrency(redistribution!.montoARedistribuir) }}</span>
-          </div>
-        </div>
-        <div class="budget-hint">El excedente se distribuye proporcionalmente entre las asignaciones existentes.</div>
-        <table class="budget-table">
-          <thead>
-            <tr>
-              <th>CATEGORÍA</th>
-              <th>ACTUAL</th>
-              <th>PROPUESTO</th>
-              <th>INCREMENTO</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (ajuste of redistribution!.ajustes; track ajuste.id) {
-              <tr>
-                <td>{{ ajuste.categoriaNombre }}</td>
-                <td>{{ formatCurrency(ajuste.amountActual) }}</td>
-                <td>{{ formatCurrency(ajuste.amountPropuesto) }}</td>
-                <td class="cyan">+{{ formatCurrency(ajuste.delta) }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-        <div class="allocation-form" style="margin-top: 12px;">
-          <button
-            class="btn-primary"
-            (click)="applyRedistribution()"
-            [disabled]="redistributing || !isActivePeriod()"
-          >
-            Aplicar redistribución
-          </button>
-        </div>
-        <div class="save-msg">{{ redistributionMsg }}</div>
-      } @else {
-        @if (redistribution) {
-          <div class="budget-empty">{{ redistributionMotivoText() }}</div>
-        } @else {
-          <div class="budget-empty">Cargando propuesta…</div>
-        }
-      }
-    </div>
   }
 </div>

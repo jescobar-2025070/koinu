@@ -53,12 +53,6 @@
           <div class="summary-label">ASIGNADO</div>
           <div class="summary-value">{{ formatCurrency(presupuestoAsignado) }}</div>
         </div>
-        <div class="summary-card">
-          <div class="summary-label">EXCEDENTE</div>
-          <div class="summary-value" [class.summary-value--expense]="presupuestoExcedente > 0">
-            {{ formatCurrency(presupuestoExcedente) }}
-          </div>
-        </div>
       }
     </div>
 

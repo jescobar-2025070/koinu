@@ -90,56 +90,10 @@ export interface AsignacionPresupuesto {
   createdAt: string;
 }
 
-export interface ExcedenteMovimiento {
-  id: string;
-  date: string;
-  amount: number;
-  description: string | null;
-  categoriaId: string | null;
-  categoriaNombre: string | null;
-}
-
-export interface ExcedentePresupuesto {
-  id: string;
-  presupuestoId: string;
-  movimientoId: string;
-  amount: number;
-  createdAt: string;
-  movimiento: ExcedenteMovimiento;
-}
-
 export interface BudgetData {
   presupuesto: Presupuesto | null;
   asignaciones: AsignacionPresupuesto[];
   asignadoTotal: number;
-  excedenteTotal: number;
-}
-
-export interface OverrunsData {
-  excedenteTotal: number;
-  excedentes: ExcedentePresupuesto[];
-}
-
-export type RedistribucionMotivo = 'SIN_PRESUPUESTO' | 'SIN_EXCEDENTE' | 'SIN_HOLGURA' | 'SIN_ASIGNACIONES';
-
-export interface RedistribucionAjuste {
-  id: string;
-  categoriaGastoId: string;
-  categoriaNombre: string;
-  amountActual: number;
-  amountPropuesto: number;
-  delta: number;
-}
-
-export interface RedistribucionPropuesta {
-  redistribuible: boolean;
-  motivo?: RedistribucionMotivo;
-  totalPresupuesto: number;
-  asignadoTotal: number;
-  excedenteTotal: number;
-  holgura: number;
-  montoARedistribuir: number;
-  ajustes: RedistribucionAjuste[];
 }
 
 export interface MovimientoStats {
@@ -171,8 +125,6 @@ export interface DashboardData {
     id: string;
     totalAmount: number;
     asignadoTotal: number;
-    excedenteTotal: number;
-    excedentes: ExcedentePresupuesto[];
     asignaciones: AsignacionPresupuesto[];
   } | null;
   disponiblePorPresupuesto: number | null;
@@ -203,7 +155,6 @@ export interface ReportData {
     total: number;
     asignado: number;
     disponible: number;
-    excedente: number;
   } | null;
   porCategoria: ReportCategoryRow[];
   objetivos: {
