@@ -155,6 +155,24 @@ export class MovimientoRepository {
     }));
   }
 
+  async getExpenseTotalByCategory(
+    periodoId: string,
+    expenseCategoryId: string,
+    excludeMovementId?: string,
+  ): Promise<number> {
+    let query = `
+      SELECT COALESCE(SUM(amount), 0) AS total
+        FROM movimientos
+       WHERE periodo_id = $1 AND type = 'EXPENSE' AND expense_category_id = $2 AND deleted_at IS NULL`;
+    const params: any[] = [periodoId, expenseCategoryId];
+    if (excludeMovementId) {
+      params.push(excludeMovementId);
+      query += ` AND id != $${params.length}`;
+    }
+    const result = await this.db.query<{ total: number }>(query, params);
+    return Number(result.rows[0]?.total ?? 0);
+  }
+
   async getCategoryBreakdown(periodoId: string): Promise<
     { categoryId: string | null; nombre: string; type: MovimientoType; total: number }[]
   > {

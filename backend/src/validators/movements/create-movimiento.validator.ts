@@ -1,4 +1,5 @@
 import { ValidationResult, validationFailure, validationSuccess } from '../validator-result';
+import { isAmountTooLarge, MAX_AMOUNT_FORMATTED } from '../../utils/amount.utils';
 
 interface CreateMovimientoRequest {
   periodId: string;
@@ -56,6 +57,8 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
     }
     if (isNaN(grossAmount) || grossAmount <= 0) {
       errors.grossAmount = 'El monto bruto debe ser un número mayor a 0.';
+    } else if (isAmountTooLarge(grossAmount)) {
+      errors.grossAmount = `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`;
     }
     if (isNaN(retentionAmount) || retentionAmount < 0) {
       errors.retentionAmount = 'La retención debe ser un número mayor o igual a 0.';
@@ -71,6 +74,8 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
     }
     if (isNaN(amount) || amount <= 0) {
       errors.amount = 'El monto debe ser un número mayor a 0.';
+    } else if (isAmountTooLarge(amount)) {
+      errors.amount = `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`;
     }
     if (objetivoId) {
       errors.objetivoId = 'Solo los ingresos pueden aportar a un objetivo.';

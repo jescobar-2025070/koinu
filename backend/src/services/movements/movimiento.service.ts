@@ -15,7 +15,9 @@ import { DetalleIngresoRepository } from '../../repositories/detalle-ingreso.rep
 import { CategoriaIngresoRepository } from '../../repositories/categoria-ingreso.repository';
 import { CategoriaGastoRepository } from '../../repositories/categoria-gasto.repository';
 import { ObjetivoRepository } from '../../repositories/objetivo.repository';
-import { BudgetService } from '../budgets/budget.service';
+import { PresupuestoRepository } from '../../repositories/presupuesto.repository';
+import { AsignacionPresupuestoRepository } from '../../repositories/asignacion-presupuesto.repository';
+import { isAmountTooLarge, MAX_AMOUNT_FORMATTED } from '../../utils/amount.utils';
 
 export interface CrearMovimientoInput {
   periodId: string;
@@ -78,6 +80,9 @@ export class MovimientoService {
         statusCode: 422,
       });
     }
+    if (data.date) {
+      this.assertNotFutureDate(data.date);
+    }
 
     if (data.type === 'INCOME') {
       return this.createIngreso(userId, data, periodo.id, fecha);
@@ -123,6 +128,12 @@ export class MovimientoService {
       throw new AppError(ErrorCodes.VALIDATION_ERROR, {
         message: 'El monto bruto debe ser un número mayor a 0.',
         statusCode: 400,
+      });
+    }
+    if (isAmountTooLarge(gross)) {
+      throw new AppError(ErrorCodes.AMOUNT_TOO_LARGE, {
+        message: `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`,
+        statusCode: 422,
       });
     }
     const retention = data.retentionAmount ?? 0;
@@ -177,9 +188,6 @@ export class MovimientoService {
         },
       });
 
-      const budgetService = new BudgetService();
-      await budgetService.recomputeOverruns(client, periodoId);
-
       return { movimiento, detalle };
     });
   }
@@ -197,7 +205,8 @@ export class MovimientoService {
       });
     }
 
-    if (!data.expenseCategoryId) {
+    const expenseCategoryId = data.expenseCategoryId;
+    if (!expenseCategoryId) {
       throw new AppError(ErrorCodes.VALIDATION_ERROR, {
         message: 'La categoría de gasto es obligatoria.',
         statusCode: 400,
@@ -211,7 +220,7 @@ export class MovimientoService {
       });
     }
 
-    const categoria = await this.categoriaGastoRepository.findById(data.expenseCategoryId);
+    const categoria = await this.categoriaGastoRepository.findById(expenseCategoryId);
     if (!categoria || (categoria.userId !== null && categoria.userId !== userId)) {
       throw new AppError(ErrorCodes.FORBIDDEN, {
         message: 'Categoría de gasto no válida.',
@@ -226,14 +235,32 @@ export class MovimientoService {
         statusCode: 400,
       });
     }
+    if (isAmountTooLarge(amount)) {
+      throw new AppError(ErrorCodes.AMOUNT_TOO_LARGE, {
+        message: `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`,
+        statusCode: 422,
+      });
+    }
 
     return withTransaction(async (client) => {
       const movimientoRepo = new MovimientoRepository(client);
+
+      const stats = await movimientoRepo.getStatsByPeriodo(periodoId);
+      const disponible = Number(stats.totalIngresos) - Number(stats.totalGastos);
+      if (amount > disponible) {
+        throw new AppError(ErrorCodes.INSUFFICIENT_FUNDS, {
+          message: this.insufficientFundsMessage(disponible),
+          statusCode: 422,
+        });
+      }
+
+      await this.assertWithinCategoryAllocation(client, periodoId, expenseCategoryId, amount);
+
       const movimiento = await movimientoRepo.create({
         userId,
         periodoId,
         type: 'EXPENSE',
-        expenseCategoryId: data.expenseCategoryId,
+        expenseCategoryId,
         amount,
         description: data.description,
         expenseType: data.expenseType,
@@ -249,9 +276,6 @@ export class MovimientoService {
           movimiento: this.movementSummary(movimiento),
         },
       });
-
-      const budgetService = new BudgetService();
-      await budgetService.recomputeOverruns(client, periodoId);
 
       return { movimiento };
     });
@@ -303,7 +327,13 @@ export class MovimientoService {
         });
       }
       if (movimiento.objetivoId) {
-        await this.adjustObjetivo(client, movimiento.objetivoId, -Number(movimiento.amount));
+        const esRetiro =
+          movimiento.type === 'INCOME' && movimiento.incomeCategoryId === null;
+        await this.adjustObjetivo(
+          client,
+          movimiento.objetivoId,
+          esRetiro ? Number(movimiento.amount) : -Number(movimiento.amount),
+        );
       }
       await this.logAuditoria(client, {
         movimientoId: movimiento.id,
@@ -314,9 +344,7 @@ export class MovimientoService {
           movimiento: this.movementSummary(movimiento),
         },
       });
-      const budgetService = new BudgetService();
-      await budgetService.recomputeOverruns(client, movimiento.periodoId);
-    });
+      });
   }
 
   async update(
@@ -371,6 +399,19 @@ export class MovimientoService {
           statusCode: 422,
         });
       }
+      this.assertNotFutureDate(data.date);
+    }
+
+    const isInternalMovement =
+      (movimiento.type === 'EXPENSE' && movimiento.objetivoId !== null) ||
+      (movimiento.type === 'INCOME' &&
+        movimiento.objetivoId !== null &&
+        movimiento.incomeCategoryId === null);
+    if (isInternalMovement) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'Este movimiento es un aporte o retiro de objetivo y no puede editarse.',
+        statusCode: 400,
+      });
     }
 
     if (movimiento.type === 'INCOME') {
@@ -412,6 +453,12 @@ export class MovimientoService {
         throw new AppError(ErrorCodes.VALIDATION_ERROR, {
           message: 'El monto bruto debe ser un número mayor a 0.',
           statusCode: 400,
+        });
+      }
+      if (isAmountTooLarge(gross)) {
+        throw new AppError(ErrorCodes.AMOUNT_TOO_LARGE, {
+          message: `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`,
+          statusCode: 422,
         });
       }
       const retention = data.retentionAmount ?? Number(detalle?.retentionAmount ?? 0);
@@ -490,8 +537,6 @@ export class MovimientoService {
         tipo: 'MODIFICADO',
         resumen: this.buildModifyResumen(movimiento, updated),
       });
-      const budgetService = new BudgetService();
-      await budgetService.recomputeOverruns(client, movimiento.periodoId);
       return updated;
     });
   }
@@ -526,6 +571,12 @@ export class MovimientoService {
           statusCode: 400,
         });
       }
+      if (isAmountTooLarge(data.amount)) {
+        throw new AppError(ErrorCodes.AMOUNT_TOO_LARGE, {
+          message: `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`,
+          statusCode: 422,
+        });
+      }
       payload.amount = data.amount;
     }
     if (data.description !== undefined) {
@@ -546,6 +597,28 @@ export class MovimientoService {
 
     return withTransaction(async (client) => {
       const movimientoRepo = new MovimientoRepository(client);
+
+      if (payload.amount !== undefined && payload.amount !== Number(movimiento.amount)) {
+        const stats = await movimientoRepo.getStatsByPeriodo(movimiento.periodoId);
+        const disponible =
+          Number(stats.totalIngresos) - Number(stats.totalGastos) + Number(movimiento.amount);
+        if (payload.amount > disponible) {
+          throw new AppError(ErrorCodes.INSUFFICIENT_FUNDS, {
+            message: this.insufficientFundsMessage(disponible),
+            statusCode: 422,
+          });
+        }
+        if (movimiento.expenseCategoryId) {
+          await this.assertWithinCategoryAllocation(
+            client,
+            movimiento.periodoId,
+            movimiento.expenseCategoryId,
+            payload.amount,
+            movimiento.id,
+          );
+        }
+      }
+
       const updated = await movimientoRepo.update(movimiento.id, payload);
       if (!updated) {
         throw new AppError(ErrorCodes.INTERNAL_ERROR, {
@@ -560,8 +633,6 @@ export class MovimientoService {
         tipo: 'MODIFICADO',
         resumen: this.buildModifyResumen(movimiento, updated),
       });
-      const budgetService = new BudgetService();
-      await budgetService.recomputeOverruns(client, movimiento.periodoId);
       return updated;
     });
   }
@@ -625,6 +696,68 @@ export class MovimientoService {
     }
     const trimmed = String(value).trim();
     return trimmed || null;
+  }
+
+  private assertNotFutureDate(dateStr: string): void {
+    if (dateStr.slice(0, 10) > this.todayLocalISO()) {
+      throw new AppError(ErrorCodes.DATE_IN_FUTURE, {
+        message: 'La fecha no puede ser posterior a hoy.',
+        statusCode: 422,
+      });
+    }
+  }
+
+  private todayLocalISO(): string {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private insufficientFundsMessage(disponible: number): string {
+    const formatted = Number(disponible).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return `Fondos insuficientes. Los gastos del período no pueden superar el dinero disponible. Disponible: Q ${formatted}.`;
+  }
+
+  private async assertWithinCategoryAllocation(
+    db: Db,
+    periodoId: string,
+    expenseCategoryId: string,
+    amount: number,
+    excludeMovementId?: string,
+  ): Promise<void> {
+    const presupuestoRepo = new PresupuestoRepository(db);
+    const presupuesto = await presupuestoRepo.findByPeriodo(periodoId);
+    if (!presupuesto) {
+      return;
+    }
+    const asignacionRepo = new AsignacionPresupuestoRepository(db);
+    const asignaciones = await asignacionRepo.findByPresupuesto(presupuesto.id);
+    const asignacion = asignaciones.find((a) => a.categoriaGastoId === expenseCategoryId);
+    if (!asignacion) {
+      return;
+    }
+    const movimientoRepo = new MovimientoRepository(db);
+    const consumido = await movimientoRepo.getExpenseTotalByCategory(
+      periodoId,
+      expenseCategoryId,
+      excludeMovementId,
+    );
+    const remanente = Number(asignacion.amount) - consumido;
+    if (amount > remanente) {
+      const formatted = Number(remanente).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      throw new AppError(ErrorCodes.EXPENSE_EXCEEDS_CATEGORY_ALLOCATION, {
+        message: `El gasto supera el remanente asignado a la categoría. Remanente disponible: Q ${formatted}.`,
+        statusCode: 422,
+      });
+    }
   }
 
   private async assertObjetivoElegible(objetivoId: string, userId: string): Promise<void> {
