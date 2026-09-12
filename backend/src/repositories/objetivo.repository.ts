@@ -187,6 +187,17 @@ export class ObjetivoRepository {
     return result.rows[0] ? mapRow(result.rows[0]) : null;
   }
 
+  async linkPeriodo(id: string, periodoId: string): Promise<Objetivo | null> {
+    const result = await this.db.query<ObjetivoRow>(
+      `UPDATE objetivos
+          SET periodo_id = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING ${COLUMNS}`,
+      [periodoId, id],
+    );
+    return result.rows[0] ? mapRow(result.rows[0]) : null;
+  }
+
   async deposit(id: string, amount: number): Promise<Objetivo | null> {
     const result = await this.db.query<ObjetivoRow>(
       `UPDATE objetivos
