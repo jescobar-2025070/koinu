@@ -49,7 +49,7 @@
     <div class="form-highlight">
       <label>MONTO TOTAL A PAGAR</label>
       <div class="highlight-pill">{{ formatCurrency(monto) }}</div>
-      <button class="btn-primary" style="max-width:220px; margin-top:6px;" (click)="saveExpense()" [disabled]="saving">Guardar Gasto</button>
+      <button class="btn-primary" (click)="saveExpense()" [disabled]="saving">Guardar Gasto</button>
       <div class="save-msg">{{ saveMessage }}</div>
     </div>
   } @else {

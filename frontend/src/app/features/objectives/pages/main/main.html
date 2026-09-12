@@ -3,7 +3,7 @@
 
   <div class="objectives-toolbar">
     <button class="btn-primary" (click)="openForm()">
-      <span class="material-symbols-outlined" style="font-size:14px;">add</span>
+      <span class="material-symbols-outlined icon-sm">add</span>
       Nuevo Objetivo
     </button>
   </div>
@@ -46,7 +46,7 @@
           <input type="text" class="glow-pill" [(ngModel)]="formDescription" placeholder="Opcional">
         </div>
       </div>
-      <button class="btn-primary" style="max-width:220px; margin-top:6px;" (click)="createObjetivo()" [disabled]="saving">
+      <button class="btn-primary form-submit" (click)="createObjetivo()" [disabled]="saving">
         Guardar Objetivo
       </button>
     </div>
@@ -68,20 +68,20 @@
           <div class="objective-actions">
             @if (obj.status === 'ACTIVE') {
               <button class="row-action" (click)="openTransaction(obj, 'DEPOSIT')" title="Depositar">
-                <span class="material-symbols-outlined" style="font-size:14px;">add</span>
+                <span class="material-symbols-outlined icon-sm">add</span>
               </button>
               <button class="row-action" (click)="openTransaction(obj, 'WITHDRAW')" title="Retirar">
-                <span class="material-symbols-outlined" style="font-size:14px;">remove</span>
+                <span class="material-symbols-outlined icon-sm">remove</span>
               </button>
               <button class="row-action" (click)="completeObjetivo(obj)" title="Completar">
-                <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>
+                <span class="material-symbols-outlined icon-sm">check_circle</span>
               </button>
               <button class="row-action" (click)="cancelObjetivo(obj)" title="Cancelar">
-                <span class="material-symbols-outlined" style="font-size:14px;">cancel</span>
+                <span class="material-symbols-outlined icon-sm">cancel</span>
               </button>
             }
             <button class="row-action" (click)="deleteObjetivo(obj)" title="Eliminar">
-              <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
+              <span class="material-symbols-outlined icon-sm">delete</span>
             </button>
           </div>
         </div>
@@ -107,11 +107,11 @@
   @if (transaccion) {
     <div class="transaction-panel">
       <div class="section-title">{{ transaccion.tipo === 'DEPOSIT' ? 'DEPOSITAR' : 'RETIRAR' }}</div>
-      <div class="form-field" style="max-width:260px;">
+      <div class="form-field transaction-amount">
         <label>MONTO (Q)</label>
         <input type="number" step="0.01" min="0" class="glow-pill" [(ngModel)]="transaccion.amount">
       </div>
-      <div style="display:flex; gap:10px; margin-top:8px;">
+      <div class="transaction-actions">
         <button class="btn-primary" (click)="confirmarTransaccion()">Confirmar</button>
         <button class="btn-secondary" (click)="transaccion = null">Cancelar</button>
       </div>

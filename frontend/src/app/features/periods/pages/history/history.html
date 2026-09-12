@@ -17,12 +17,12 @@
             <td>{{ period.name }}</td>
             <td>{{ period.range }}</td>
             <td>{{ period.statusLabel }}</td>
-            <td class="right" style="color:var(--green)">{{ formatCurrency(period.totalIngresos) }}</td>
-            <td class="right" style="color:#ff8080">{{ formatCurrency(period.totalGastos) }}</td>
+            <td class="right text-green">{{ formatCurrency(period.totalIngresos) }}</td>
+            <td class="right text-red">{{ formatCurrency(period.totalGastos) }}</td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="5" style="text-align:center; color:rgba(255,255,255,0.5);">No hay períodos en el historial</td>
+            <td colspan="5" class="table-empty">No hay períodos en el historial</td>
           </tr>
         }
       </tbody>

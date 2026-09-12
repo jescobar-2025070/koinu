@@ -63,7 +63,7 @@
     <div class="form-highlight">
       <label>MONTO NETO A RECIBIR</label>
       <div class="highlight-pill">{{ formatCurrency(montoNeto) }}</div>
-      <button class="btn-primary" style="max-width:220px; margin-top:6px;" (click)="saveIncome()" [disabled]="saving">Guardar Ingreso</button>
+      <button class="btn-primary" (click)="saveIncome()" [disabled]="saving">Guardar Ingreso</button>
       <div class="save-msg">{{ saveMessage }}</div>
     </div>
   } @else {

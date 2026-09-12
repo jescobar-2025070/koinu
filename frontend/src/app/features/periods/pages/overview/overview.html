@@ -1,4 +1,4 @@
-<div style="flex:1; display:flex; flex-direction:column; min-height:0;">
+<div class="overview-view">
   @if (hasActive) {
     <div class="grid-2x2-top">
       <div>
@@ -50,7 +50,7 @@
                 <span class="draft-name">{{ p.name }}</span>
                 <span class="draft-range">{{ formatDateRange(p) }}</span>
               </div>
-              <button class="btn-primary draft-btn" (click)="activatePeriod(p.id)">Activar</button>
+              <button class="btn-primary" (click)="activatePeriod(p.id)">Activar</button>
             </div>
           }
         </div>

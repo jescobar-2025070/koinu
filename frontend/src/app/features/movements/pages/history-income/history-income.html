@@ -46,10 +46,10 @@
               </td>
               <td class="actions-cell">
                 <button class="row-action row-action--save" (click)="saveEdit(movement)">
-                  <span class="material-symbols-outlined" style="font-size:14px;">check</span>
+                  <span class="material-symbols-outlined icon-sm">check</span>
                 </button>
                 <button class="row-action row-action--cancel" (click)="cancelEdit()">
-                  <span class="material-symbols-outlined" style="font-size:14px;">close</span>
+                  <span class="material-symbols-outlined icon-sm">close</span>
                 </button>
               </td>
             </tr>
@@ -61,17 +61,17 @@
               <td class="wrap">{{ movement.description ?? '—' }}</td>
               <td>{{ getObjetivoName(movement.objetivoId) }}</td>
               <td class="right">{{ formatCurrency(movement.amount) }}</td>
-              <td class="right" style="color:rgba(255,255,255,0.5);">—</td>
+              <td class="right text-dim">—</td>
               <td>
                 <button class="row-action" (click)="editMovement(i)">
-                  <span class="material-symbols-outlined" style="font-size:14px;">edit</span>
+                  <span class="material-symbols-outlined icon-sm">edit</span>
                 </button>
               </td>
             </tr>
           }
         } @empty {
           <tr>
-            <td colspan="8" style="text-align:center; color:rgba(255,255,255,0.5);">No hay ingresos registrados</td>
+            <td colspan="8" class="table-empty">No hay ingresos registrados</td>
           </tr>
         }
       </tbody>
