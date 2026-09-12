@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { AdminService } from '../../../../core/services/admin.service';
 import { SystemService } from '../../../../core/services/system.service';
+import { DialogService } from '../../../../core/services/dialog.service';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { User } from '../../../../core/auth/auth.models';
 import { AdminPeriod, SystemHealth } from '../../../../core/models/api.models';
@@ -18,6 +19,7 @@ export class Admin implements OnInit {
   private readonly adminService = inject(AdminService);
   private readonly systemService = inject(SystemService);
   private readonly sidebarService = inject(SidebarService);
+  private readonly dialogService = inject(DialogService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   users: User[] = [];
@@ -113,7 +115,13 @@ export class Admin implements OnInit {
   }
 
   async deleteUser(u: User): Promise<void> {
-    if (!window.confirm(`¿Eliminar la cuenta de ${u.email}? Esta acción no se puede deshacer.`)) {
+    const confirmed = await this.dialogService.confirm({
+      title: 'ELIMINAR CUENTA',
+      message: `¿Eliminar la cuenta de ${u.email}? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     this.setBusy(u.id, true);
@@ -155,8 +163,17 @@ export class Admin implements OnInit {
   }
 
   async updateEmail(u: User): Promise<void> {
-    const next = window.prompt('Nuevo correo electrónico:', u.email);
-    if (!next || !next.trim() || next.trim() === u.email) {
+    const next = await this.dialogService.prompt({
+      title: 'EDITAR CORREO',
+      message: `Usuario: ${u.email}`,
+      label: 'Nuevo correo electrónico',
+      value: u.email,
+      confirmLabel: 'Guardar',
+    });
+    if (next === null) {
+      return;
+    }
+    if (!next.trim() || next.trim() === u.email) {
       return;
     }
     this.setBusy(u.id, true);
@@ -173,8 +190,16 @@ export class Admin implements OnInit {
   }
 
   async resetPassword(u: User): Promise<void> {
-    const next = window.prompt(`Nueva contraseña para ${u.email}:`);
-    if (!next || next.length < 8) {
+    const next = await this.dialogService.prompt({
+      title: 'RESTABLECER CONTRASEÑA',
+      message: `Nueva contraseña para ${u.email}:`,
+      label: 'Contraseña (mínimo 8 caracteres, letra y número)',
+      confirmLabel: 'Guardar',
+    });
+    if (next === null) {
+      return;
+    }
+    if (next.length < 8) {
       this.rowMsg.set(u.id, 'La contraseña debe tener al menos 8 caracteres, una letra y un número.');
       return;
     }
@@ -195,7 +220,13 @@ export class Admin implements OnInit {
   }
 
   async cancelPeriod(p: AdminPeriod): Promise<void> {
-    if (!window.confirm(`¿Cancelar el período "${p.name}" de ${p.userEmail}?`)) {
+    const confirmed = await this.dialogService.confirm({
+      title: 'CANCELAR PERÍODO',
+      message: `¿Cancelar el período "${p.name}" de ${p.userEmail}?`,
+      confirmLabel: 'Cancelar',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     this.periodBusy.set(p.id, true);

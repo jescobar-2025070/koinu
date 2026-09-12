@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
+import { DialogService } from '../../../../core/services/dialog.service';
 import { Periodo } from '../../../../core/models/api.models';
 
 @Component({
@@ -14,6 +15,7 @@ export class PeriodsFinalize implements OnInit {
   private readonly sidebarService = inject(SidebarService);
   private readonly periodoService = inject(PeriodoService);
   private readonly movimientoService = inject(MovimientoService);
+  private readonly dialogService = inject(DialogService);
   private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -62,7 +64,12 @@ export class PeriodsFinalize implements OnInit {
 
   async finalizePeriod(): Promise<void> {
     if (!this.currentPeriod) return;
-    const confirmed = window.confirm(`¿Finalizar "${this.currentPeriod.name}"? Se guardará el informe final y el período dejará de estar activo.`);
+    const confirmed = await this.dialogService.confirm({
+      title: 'FINALIZAR PERÍODO',
+      message: `¿Finalizar "${this.currentPeriod.name}"? Se guardará el informe final y el período dejará de estar activo.`,
+      confirmLabel: 'Finalizar',
+      danger: true,
+    });
     if (!confirmed) return;
     this.finalizing = true;
     this.saveMessage = '';
