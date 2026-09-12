@@ -14,6 +14,18 @@ function isRefreshExempt(url: string): boolean {
   );
 }
 
+function isPublicPage(url: string): boolean {
+  const path = url.split('?')[0];
+  return (
+    path === '' ||
+    path === '/' ||
+    path === '/login' ||
+    path === '/register' ||
+    path === '/forgot-password' ||
+    path === '/reset-password'
+  );
+}
+
 export const authErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const router = inject(Router);
@@ -40,7 +52,9 @@ export const authErrorInterceptor: HttpInterceptorFn = (req, next) => {
           authService.handleSessionEnded();
         } else {
           authService.clearSession();
-          void router.navigate(['/login']);
+          if (!isPublicPage(router.url)) {
+            void router.navigate(['/login']);
+          }
         }
         return throwError(() => error);
       }
