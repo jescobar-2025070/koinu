@@ -36,6 +36,7 @@ export class DashboardReports implements OnInit {
   generadoEn = '';
   movements: Movimiento[] = [];
   auditoria: MovimientoAuditoria[] = [];
+  exportMsg = '';
   private categories: Categoria[] = [];
 
   ngOnInit(): void {
@@ -220,32 +221,44 @@ export class DashboardReports implements OnInit {
       .join(', ');
   }
 
-  exportCsv(): void {
-    const headers = ['Fecha', 'Tipo', 'Categoría', 'Clasificación', 'Descripción', 'Monto'];
-    const rows = this.movements.map((m) => [
-      this.formatDate(m.date),
-      m.type === 'INCOME' ? 'Ingreso' : 'Gasto',
-      this.getCategoryName(m.type === 'INCOME' ? m.incomeCategoryId : m.expenseCategoryId),
-      m.type === 'INCOME'
-        ? (m.incomeClassification === 'OCASIONAL' ? 'Ocasional' : 'Regular')
-        : (m.expenseType === 'FIJO' ? 'Fijo' : 'Variable'),
-      m.description ?? '',
-      m.amount.toFixed(2),
-    ]);
+  async exportCsv(): Promise<void> {
+    if (this.movements.length === 0) {
+      return;
+    }
+    try {
+      const headers = ['Fecha', 'Tipo', 'Categoría', 'Clasificación', 'Descripción', 'Monto'];
+      const rows = this.movements.map((m) => [
+        this.formatDate(m.date),
+        m.type === 'INCOME' ? 'Ingreso' : 'Gasto',
+        this.getCategoryName(m.type === 'INCOME' ? m.incomeCategoryId : m.expenseCategoryId),
+        m.type === 'INCOME'
+          ? (m.incomeClassification === 'OCASIONAL' ? 'Ocasional' : 'Regular')
+          : (m.expenseType === 'FIJO' ? 'Fijo' : 'Variable'),
+        m.description ?? '',
+        Number(m.amount).toFixed(2),
+      ]);
 
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
+      const csv = [headers, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
 
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const period = this.activePeriodName !== '—' ? this.activePeriodName.replace(/\s+/g, '_') : 'general';
-    a.href = url;
-    a.download = `informe_${period}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const period = this.activePeriodName !== '—' ? this.activePeriodName.replace(/\s+/g, '_') : 'general';
+      const filename = `informe_${period}.csv`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.exportMsg = 'Reporte exportado correctamente.';
+    } catch (e) {
+      console.error('Error al exportar CSV:', e);
+      this.exportMsg = 'No se pudo exportar el reporte.';
+    }
+    this.cdr.markForCheck();
   }
 }

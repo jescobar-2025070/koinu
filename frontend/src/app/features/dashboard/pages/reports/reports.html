@@ -136,6 +136,9 @@
         <span class="material-symbols-outlined" style="font-size:14px;">download</span>
         Exportar CSV
       </button>
+      @if (exportMsg) {
+        <span class="export-msg">{{ exportMsg }}</span>
+      }
     </div>
     <div class="table-wrap scroll-y">
       <table>
