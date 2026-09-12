@@ -17,84 +17,12 @@
 }
 
 .section-title {
-  font-size: 1.15rem;
-  font-weight: 800;
   margin-bottom: 12px;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: linear-gradient(180deg, #6fb3ff 0%, #2f6fd6 100%);
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.85rem;
-  box-shadow: 0 6px 20px rgba(45, 110, 220, 0.5);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(45, 110, 220, 0.6);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  padding: 10px 18px;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 40px;
-  row-gap: 24px;
-}
-
-.form-field label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  margin-bottom: 12px;
-}
-
-.glow-pill {
-  width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(180deg, rgba(120, 170, 230, 0.35), rgba(30, 55, 95, 0.55));
-  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.15), inset 0 -4px 10px rgba(0, 0, 0, 0.25);
-  border-radius: 50px;
-  padding: 12px 20px;
-  font-family: inherit;
-  font-size: 0.92rem;
-  color: #fff;
-}
-
-.save-msg {
-  font-size: 0.78rem;
-  color: var(--green);
-  height: 16px;
 }
 
 .row-action {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: none;
   background: rgba(0, 229, 255, 0.18);
@@ -103,6 +31,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .row-action:hover {
@@ -142,6 +71,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .objective-name {
@@ -151,6 +82,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .status-pill {
@@ -198,10 +130,6 @@
   font-size: 0.82rem;
 }
 
-.form-field-wide {
-  grid-column: 1 / -1;
-}
-
 .objective-actions {
   display: flex;
   gap: 6px;
@@ -211,6 +139,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .objective-current {
@@ -241,6 +170,7 @@
 .objective-progress-text {
   color: var(--text-dim2);
   font-size: 0.75rem;
+  overflow-wrap: anywhere;
 }
 
 .objectives-empty {
@@ -258,8 +188,12 @@
   flex-direction: column;
 }
 
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
+.transaction-amount {
+  max-width: 260px;
+}
+
+.transaction-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
 }

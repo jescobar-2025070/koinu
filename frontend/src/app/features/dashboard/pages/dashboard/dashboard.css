@@ -148,18 +148,6 @@ h2.welcome {
   min-width: 0;
 }
 
-.stat-value.green {
-  color: #7ed957;
-}
-
-.stat-value.cyan {
-  color: #0cc0df;
-}
-
-.stat-value.negative {
-  color: #ff8a80;
-}
-
 @media (max-width: 768px) {
   .budget-stats {
     grid-template-columns: 1fr 1fr;

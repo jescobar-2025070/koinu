@@ -49,18 +49,6 @@
   margin-bottom: 4px;
 }
 
-.dialog-input {
-  width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(180deg, rgba(120, 170, 230, 0.35), rgba(30, 55, 95, 0.55));
-  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.15), inset 0 -4px 10px rgba(0, 0, 0, 0.25);
-  border-radius: 50px;
-  padding: 12px 20px;
-  font-family: inherit;
-  font-size: 0.92rem;
-  color: #fff;
-}
-
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -68,47 +56,10 @@
   margin-top: 6px;
 }
 
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: linear-gradient(180deg, #6fb3ff 0%, #2f6fd6 100%);
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.85rem;
-  box-shadow: 0 6px 20px rgba(45, 110, 220, 0.5);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(45, 110, 220, 0.6);
-}
-
 .btn-primary.btn-danger {
   background: linear-gradient(180deg, #ff8a80 0%, #d32f2f 100%);
   border-color: rgba(255, 138, 128, 0.5);
   box-shadow: 0 6px 20px rgba(211, 47, 47, 0.5);
-}
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-dim2);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-pill);
-  padding: 10px 20px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.16);
 }
 
 @keyframes fadeIn {
