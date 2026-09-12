@@ -74,6 +74,10 @@ export class MovementsIncome implements OnInit {
     return this.periodos.length > 0;
   }
 
+  get maxDate(): string {
+    return todayLocalISO();
+  }
+
   get tratamientoSeleccionado(): TratamientoFiscal | undefined {
     return this.tratamientos.find((t) => t.id === this.selectedTratamientoId);
   }

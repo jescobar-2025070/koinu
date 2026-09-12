@@ -59,6 +59,10 @@ export class MovementsExpenses implements OnInit {
     return this.periodos.length > 0;
   }
 
+  get maxDate(): string {
+    return todayLocalISO();
+  }
+
   formatCurrency(amount: number): string {
     return 'Q ' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
