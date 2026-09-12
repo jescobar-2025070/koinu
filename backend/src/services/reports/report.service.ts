@@ -8,7 +8,6 @@ import { PeriodoRepository } from '../../repositories/periodo.repository';
 import { MovimientoRepository } from '../../repositories/movimiento.repository';
 import { PresupuestoRepository } from '../../repositories/presupuesto.repository';
 import { AsignacionPresupuestoRepository } from '../../repositories/asignacion-presupuesto.repository';
-import { ExcedentePresupuestoRepository } from '../../repositories/excedente-presupuesto.repository';
 import { ObjetivoRepository } from '../../repositories/objetivo.repository';
 import { SnapshotInformeRepository } from '../../repositories/snapshot-informe.repository';
 
@@ -35,7 +34,6 @@ export interface ReportData {
     total: number;
     asignado: number;
     disponible: number;
-    excedente: number;
   } | null;
   porCategoria: ReportCategoryRow[];
   objetivos: {
@@ -127,7 +125,6 @@ export class ReportService {
     const movimientoRepo = new MovimientoRepository(db);
     const presupuestoRepo = new PresupuestoRepository(db);
     const asignacionRepo = new AsignacionPresupuestoRepository(db);
-    const excedenteRepo = new ExcedentePresupuestoRepository(db);
     const objetivoRepo = new ObjetivoRepository(db);
 
     const stats = await movimientoRepo.getStatsByPeriodo(periodo.id);
@@ -139,12 +136,10 @@ export class ReportService {
 
     const presupuesto = await presupuestoRepo.findByPeriodo(periodo.id);
     let presupuestoInfo: ReportData['presupuesto'] = null;
-    let excedente = 0;
     const asignacionPorCategoria: Record<string, number> = {};
     if (presupuesto) {
       const asignaciones = await asignacionRepo.findByPresupuesto(presupuesto.id);
       const asignado = asignaciones.reduce((s, a) => s + Number(a.amount), 0);
-      excedente = await excedenteRepo.findTotalByPresupuesto(presupuesto.id);
       for (const asignacion of asignaciones) {
         asignacionPorCategoria[asignacion.categoriaGastoId] = Number(asignacion.amount);
       }
@@ -152,7 +147,6 @@ export class ReportService {
         total: totalIngresos,
         asignado,
         disponible: Math.max(0, totalIngresos - totalGastos),
-        excedente: Number(excedente),
       };
     }
 
@@ -179,7 +173,6 @@ export class ReportService {
 
     const recomendaciones = this.buildRecomendaciones({
       presupuesto: presupuestoInfo,
-      excedente,
       disponible,
       objetivos: objetivosInfo,
     });
@@ -205,24 +198,15 @@ export class ReportService {
 
   private buildRecomendaciones(params: {
     presupuesto: ReportData['presupuesto'];
-    excedente: number;
     disponible: number;
     objetivos: ReportData['objetivos'];
   }): string[] {
     const recomendaciones: string[] = [];
-    const fmt = (n: number): string =>
-      'Q' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     if (params.presupuesto) {
-      if (params.excedente > 0) {
-        recomendaciones.push(
-          `Tus gastos superaron tu presupuesto por ${fmt(params.excedente)}. Revisa las categorías de gasto y ajusta tu presupuesto.`,
-        );
-      } else {
-        recomendaciones.push(
-          'Te mantienes dentro de tu presupuesto general. Sigue registrando tus gastos para mantener el control.',
-        );
-      }
+      recomendaciones.push(
+        'Te mantienes dentro de tu presupuesto general. Sigue registrando tus gastos para mantener el control.',
+      );
     } else {
       recomendaciones.push(
         'Aún no has definido un presupuesto para este período. Defínelo para fijar un límite general de gasto.',

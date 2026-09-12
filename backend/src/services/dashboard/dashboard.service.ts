@@ -3,7 +3,6 @@ import { MovimientoService } from '../movements/movimiento.service';
 import { ObjetivoService } from '../objectives/objetivo.service';
 import { BudgetService } from '../budgets/budget.service';
 import { AsignacionPresupuesto } from '../../entities/asignacion-presupuesto.entity';
-import { ExcedenteConMovimiento } from '../../entities/excedente-presupuesto.entity';
 
 export interface DashboardObjetivo {
   id: string;
@@ -29,8 +28,6 @@ export interface DashboardData {
     id: string;
     totalAmount: number;
     asignadoTotal: number;
-    excedenteTotal: number;
-    excedentes: ExcedenteConMovimiento[];
     asignaciones: AsignacionPresupuesto[];
   } | null;
   disponiblePorPresupuesto: number | null;
@@ -75,8 +72,6 @@ export class DashboardService {
       this.objetivoService.findByUser(userId),
     ]);
 
-    const overruns = await this.budgetService.getOverruns(periodoActivo.id, userId);
-
     const totalIngresos = stats.totalIngresos;
     const totalGastos = stats.totalGastos;
     const disponiblePorIngresos = totalIngresos - totalGastos;
@@ -86,8 +81,6 @@ export class DashboardService {
           id: budget.presupuesto.id,
           totalAmount: Number(budget.presupuesto.totalAmount),
           asignadoTotal: budget.asignadoTotal,
-          excedenteTotal: overruns.excedenteTotal,
-          excedentes: overruns.excedentes,
           asignaciones: budget.asignaciones,
         }
       : null;

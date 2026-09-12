@@ -19,9 +19,5 @@ export function budgetRouter(): Router {
   router.patch('/budget-allocations/:id', authenticate, validate(validateUpdateAllocationRequest), controller.updateAllocation);
   router.delete('/budget-allocations/:id', authenticate, controller.deleteAllocation);
 
-  router.get('/:periodId/budget/overruns', authenticate, controller.getOverruns);
-  router.get('/:periodId/budget/redistribution', authenticate, controller.getRedistribution);
-  router.post('/:periodId/budget/redistribute', authenticate, controller.applyRedistribution);
-
   return router;
 }
