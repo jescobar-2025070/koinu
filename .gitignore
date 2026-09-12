@@ -36,3 +36,9 @@ coverage/
 
 # Pnpm
 pnpm-lock.yaml
+
+# Local-only assets: tests and E2E (not committed)
+e2e/
+backend/scripts/e2e-prepare.ts
+backend/tests/
+frontend/**/*.spec.ts
