@@ -42,7 +42,7 @@
       </div>
       <div class="summary-card">
         <div class="summary-label">DISPONIBLE</div>
-        <div class="summary-value">{{ formatCurrency(report.disponible) }}</div>
+        <div class="summary-value">{{ formatCurrency(disponibleDisplay) }}</div>
       </div>
       @if (report.presupuesto) {
         <div class="summary-card">
@@ -72,9 +72,9 @@
           <thead>
             <tr>
               <th><span class="th-pill">CATEGORÍA</span></th>
-              <th><span class="th-pill">PRESUPUESTADO</span></th>
-              <th><span class="th-pill">GASTADO</span></th>
-              <th><span class="th-pill">DESVIACIÓN</span></th>
+              <th class="th-right"><span class="th-pill">PRESUPUESTADO</span></th>
+              <th class="th-right"><span class="th-pill">GASTADO</span></th>
+              <th class="th-right"><span class="th-pill">DESVIACIÓN</span></th>
             </tr>
           </thead>
           <tbody>
@@ -83,8 +83,19 @@
                 <td>{{ row.nombre }}</td>
                 <td class="right">{{ row.presupuestado !== null ? formatCurrency(row.presupuestado) : '—' }}</td>
                 <td class="right">{{ formatCurrency(row.total) }}</td>
-                <td class="right" [style.color]="deviationAmount(row) !== null && deviationAmount(row)! > 0 ? '#ff8080' : 'var(--green)'">
-                  {{ deviationAmount(row) !== null ? formatCurrency(deviationAmount(row)!) : '—' }}
+                <td class="right">
+                  @if (deviationLabel(row) !== null) {
+                    <span
+                      class="deviation-cell"
+                      [class.text-red]="deviationLabel(row) === 'EXCEDENTE'"
+                      [class.text-green]="deviationLabel(row) === 'SOBRANTE'"
+                    >
+                      <span class="deviation-label">{{ deviationLabel(row) }}</span>
+                      <span class="deviation-amount">{{ formatCurrency(deviationDisplay(row)!) }}</span>
+                    </span>
+                  } @else {
+                    —
+                  }
                 </td>
               </tr>
             }
@@ -144,82 +155,35 @@
             <th><span class="th-pill">CLASIFICACIÓN</span></th>
             <th><span class="th-pill">DESCRIPCIÓN</span></th>
             <th><span class="th-pill">MONTO</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (movement of movements; track movement.id) {
-            <tr>
-              <td>{{ formatDate(movement.date) }}</td>
-              <td [style.color]="movement.type === 'EXPENSE' ? '#ff8080' : 'var(--green)'">
-                {{ movement.type === 'INCOME' ? 'Ingreso' : 'Gasto' }}
-              </td>
-              <td>{{ getCategoryName(movement.type === 'INCOME' ? movement.incomeCategoryId : movement.expenseCategoryId) }}</td>
-              <td>
-                @if (movement.type === 'INCOME') {
-                  {{ movement.incomeClassification === 'OCASIONAL' ? 'Ocasional' : 'Regular' }}
-                } @else {
-                  {{ movement.expenseType === 'FIJO' ? 'Fijo' : 'Variable' }}
-                }
-              </td>
-              <td class="wrap">{{ movement.description ?? '—' }}</td>
-              <td class="right">{{ formatCurrency(movement.amount) }}</td>
-            </tr>
-          } @empty {
-            <tr>
-              <td colspan="6" class="table-empty">
-                No hay movimientos en el período seleccionado
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-
-    <div class="section-subtitle">AUDITORÍA DE MOVIMIENTOS</div>
-    <div class="table-wrap scroll-y">
-      <table>
-        <thead>
-          <tr>
-            <th><span class="th-pill">FECHA</span></th>
             <th><span class="th-pill">EVENTO</span></th>
-            <th><span class="th-pill">MOVIMIENTO</span></th>
-            <th><span class="th-pill">MONTO</span></th>
             <th><span class="th-pill">DETALLE</span></th>
           </tr>
         </thead>
         <tbody>
-          @for (entry of auditoria; track entry.id) {
-            <tr>
-              <td>{{ formatDateTime(entry.createdAt) }}</td>
+          @for (row of movementRows; track row.id) {
+            <tr [class.mov-row--deleted]="row.deleted">
+              <td>{{ formatDate(row.date) }}</td>
+              <td [class.text-green]="row.type === 'INCOME'" [class.text-red]="row.type !== 'INCOME'">
+                {{ row.type === 'INCOME' ? 'Ingreso' : 'Gasto' }}
+              </td>
+              <td>{{ row.categoryName }}</td>
+              <td>{{ row.classification }}</td>
+              <td class="wrap">{{ row.description ?? '—' }}</td>
+              <td class="right">{{ formatCurrency(row.amount) }}</td>
               <td>
                 <span
                   class="audit-pill"
-                  [class.audit-creado]="entry.tipo === 'CREADO'"
-                  [class.audit-modificado]="entry.tipo === 'MODIFICADO'"
-                  [class.audit-eliminado]="entry.tipo === 'ELIMINADO'"
-                >{{ auditoriaEventoLabel(entry.tipo) }}</span>
+                  [class.audit-creado]="row.evento === 'CREADO'"
+                  [class.audit-modificado]="row.evento === 'MODIFICADO'"
+                  [class.audit-eliminado]="row.evento === 'ELIMINADO'"
+                >{{ row.evento }}</span>
               </td>
-              <td class="wrap">
-                {{ auditoriaTipoMovimiento(entry.resumen) }}
-                @if (entry.tipo === 'MODIFICADO' && entry.resumen.cambios) {
-                  <span class="text-dim">({{ auditoriaDescripcion(entry.resumen) && auditoriaDescripcion(entry.resumen) !== '—' ? auditoriaDescripcion(entry.resumen) : 'sin descripción' }})</span>
-                } @else {
-                  <span class="text-dim">({{ auditoriaDescripcion(entry.resumen) }})</span>
-                }
-              </td>
-              <td class="right">{{ formatCurrency(auditoriaMonto(entry.resumen)) }}</td>
-              <td class="wrap">
-                @if (entry.tipo === 'MODIFICADO') {
-                  {{ auditoriaCambios(entry.resumen) }}
-                } @else {
-                  —
-                }
-              </td>
+              <td class="wrap">{{ row.detalle }}</td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="5" class="table-empty">
-                No hay actividad registrada en el período seleccionado
+              <td colspan="8" class="table-empty">
+                No hay movimientos en el período seleccionado
               </td>
             </tr>
           }

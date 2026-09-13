@@ -14,6 +14,19 @@ import {
   ReportData,
 } from '../../../../core/models/api.models';
 
+interface MovementRow {
+  id: string;
+  date: string;
+  type: Movimiento['type'];
+  categoryName: string;
+  classification: string;
+  description: string | null;
+  amount: number;
+  evento: 'CREADO' | 'MODIFICADO' | 'ELIMINADO';
+  detalle: string;
+  deleted: boolean;
+}
+
 @Component({
   selector: 'app-dashboard-reports',
   templateUrl: './reports.html',
@@ -140,11 +153,97 @@ export class DashboardReports implements OnInit {
     return this.report?.objetivos ?? [];
   }
 
+  get disponibleDisplay(): number {
+    return Math.max(0, this.report?.disponible ?? 0);
+  }
+
+  get movementRows(): MovementRow[] {
+    if (this.movements.length === 0 && this.auditoria.length === 0) {
+      return [];
+    }
+
+    const auditByMovimiento = new Map<string, MovimientoAuditoria[]>();
+    for (const entry of this.auditoria) {
+      const list = auditByMovimiento.get(entry.movimientoId) ?? [];
+      list.push(entry);
+      auditByMovimiento.set(entry.movimientoId, list);
+    }
+
+    const rows: MovementRow[] = [];
+
+    for (const movement of this.movements) {
+      const events = (auditByMovimiento.get(movement.id) ?? []).sort(
+        (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      );
+      const lastMod = events.find((e) => e.tipo === 'MODIFICADO');
+      rows.push({
+        id: movement.id,
+        date: movement.date,
+        type: movement.type,
+        categoryName: this.getCategoryName(
+          movement.type === 'INCOME' ? movement.incomeCategoryId : movement.expenseCategoryId,
+        ),
+        classification: movement.type === 'INCOME'
+          ? (movement.incomeClassification === 'OCASIONAL' ? 'Ocasional' : 'Regular')
+          : (movement.expenseType === 'FIJO' ? 'Fijo' : 'Variable'),
+        description: movement.description,
+        amount: Number(movement.amount),
+        evento: lastMod ? 'MODIFICADO' : 'CREADO',
+        detalle: lastMod ? this.auditoriaCambios(lastMod.resumen) : '—',
+        deleted: false,
+      });
+    }
+
+    const activeIds = new Set(this.movements.map((m) => m.id));
+    for (const entry of this.auditoria) {
+      if (entry.tipo !== 'ELIMINADO' || activeIds.has(entry.movimientoId)) {
+        continue;
+      }
+      const resumen = entry.resumen.movimiento;
+      if (!resumen) {
+        continue;
+      }
+      const events = (auditByMovimiento.get(entry.movimientoId) ?? []).sort(
+        (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+      );
+      const lastMod = events.find((e) => e.tipo === 'MODIFICADO');
+      rows.push({
+        id: entry.movimientoId,
+        date: resumen.date,
+        type: resumen.type,
+        categoryName: '—',
+        classification: resumen.type === 'INCOME'
+          ? (resumen.incomeClassification === 'OCASIONAL' ? 'Ocasional' : 'Regular')
+          : (resumen.expenseType === 'FIJO' ? 'Fijo' : 'Variable'),
+        description: resumen.description,
+        amount: Number(resumen.amount),
+        evento: 'ELIMINADO',
+        detalle: lastMod ? this.auditoriaCambios(lastMod.resumen) : '—',
+        deleted: true,
+      });
+    }
+
+    return rows.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  }
+
   deviationAmount(row: ReportCategoryRow): number | null {
     if (row.presupuestado === null) {
       return null;
     }
     return row.total - row.presupuestado;
+  }
+
+  deviationDisplay(row: ReportCategoryRow): number | null {
+    const deviation = this.deviationAmount(row);
+    return deviation === null ? null : Math.abs(deviation);
+  }
+
+  deviationLabel(row: ReportCategoryRow): string | null {
+    const deviation = this.deviationAmount(row);
+    if (deviation === null) {
+      return null;
+    }
+    return deviation > 0 ? 'EXCEDENTE' : 'SOBRANTE';
   }
 
   progressWidth(progress: number): number {
@@ -175,45 +274,16 @@ export class DashboardReports implements OnInit {
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   }
 
-  formatDateTime(dateStr: string): string {
-    const d = new Date(dateStr);
-    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return `${this.formatDate(dateStr)} ${time}`;
-  }
-
-  auditoriaEventoLabel(tipo: string): string {
-    switch (tipo) {
-      case 'CREADO':
-        return 'CREADO';
-      case 'MODIFICADO':
-        return 'MODIFICADO';
-      case 'ELIMINADO':
-        return 'ELIMINADO';
-      default:
-        return tipo;
-    }
-  }
-
-  auditoriaTipoMovimiento(resumen: MovimientoAuditoria['resumen']): string {
-    const tipo = resumen?.movimiento?.type;
-    return tipo === 'INCOME' ? 'Ingreso' : 'Gasto';
-  }
-
-  auditoriaMonto(resumen: MovimientoAuditoria['resumen']): number {
-    return Number(resumen?.movimiento?.amount ?? 0);
-  }
-
-  auditoriaDescripcion(resumen: MovimientoAuditoria['resumen']): string {
-    return resumen?.movimiento?.description ?? '—';
-  }
-
   auditoriaCambios(resumen: MovimientoAuditoria['resumen']): string {
     const cambios = resumen?.cambios;
     if (!cambios) {
       return '—';
     }
     return Object.entries(cambios)
-      .map(([field, [antes, despues]]) => `${field}: ${antes} → ${despues}`)
+      .map(([field, [antes, despues]]) => {
+        const formatear = (v: unknown): string => (v === null || v === undefined ? '—' : String(v));
+        return `${field}: ${formatear(antes)} → ${formatear(despues)}`;
+      })
       .join(', ');
   }
 

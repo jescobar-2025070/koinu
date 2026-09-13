@@ -258,3 +258,33 @@
   background: rgba(255, 90, 90, 0.16);
   color: #ff8a80;
 }
+
+.mov-row--deleted td {
+  opacity: 0.55;
+}
+
+.mov-row--deleted td.wrap {
+  text-decoration: line-through;
+}
+
+.th-right {
+  text-align: right;
+}
+
+.deviation-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.deviation-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
+}
+
+.deviation-amount {
+  font-weight: 800;
+}
