@@ -88,7 +88,7 @@ export class ObjectivesBudget implements OnInit {
 
   totalDisponible(): number {
     return this.budget && this.budget.presupuesto
-      ? Number(this.budget.presupuesto.totalAmount) - this.budget.asignadoTotal
+      ? Math.max(0, Number(this.budget.presupuesto.totalAmount) - this.budget.asignadoTotal)
       : 0;
   }
 
@@ -99,7 +99,7 @@ export class ObjectivesBudget implements OnInit {
   }
 
   remainingOf(a: AsignacionPresupuesto): number {
-    return Number(a.amount) - this.consumedByCategory(a.categoriaGastoId);
+    return Math.max(0, Number(a.amount) - this.consumedByCategory(a.categoriaGastoId));
   }
 
   async addAllocation(): Promise<void> {
