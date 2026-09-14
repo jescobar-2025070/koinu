@@ -3,7 +3,7 @@
     <div class="form-grid">
       <div class="form-field">
         <label>MONTO DEL GASTO *</label>
-        <input type="number" step="0.01" class="glow-pill" [(ngModel)]="monto">
+        <input type="number" step="0.01" min="0.01" max="999999999999.99" class="glow-pill" [(ngModel)]="monto">
       </div>
       <div class="form-field">
         <label>PERÍODO *</label>
@@ -31,18 +31,25 @@
         </select>
       </div>
       <div class="form-field">
+        <label>TIPO DE GASTO *</label>
+        <select class="glow-pill" [(ngModel)]="selectedTipo">
+          <option value="FIJO">Fijo</option>
+          <option value="VARIABLE">Variable</option>
+        </select>
+      </div>
+      <div class="form-field">
         <label>DESCRIPCIÓN</label>
         <textarea class="glow-pill" rows="2" [(ngModel)]="descripcion"></textarea>
       </div>
       <div class="form-field">
         <label>FECHA</label>
-        <input type="date" class="glow-pill" [(ngModel)]="fecha">
+        <input type="date" [max]="maxDate" class="glow-pill" [(ngModel)]="fecha">
       </div>
     </div>
     <div class="form-highlight">
       <label>MONTO TOTAL A PAGAR</label>
       <div class="highlight-pill">{{ formatCurrency(monto) }}</div>
-      <button class="btn-primary" style="max-width:220px; margin-top:6px;" (click)="saveExpense()" [disabled]="saving">Guardar Gasto</button>
+      <button class="btn-primary" (click)="saveExpense()" [disabled]="saving">Guardar Gasto</button>
       <div class="save-msg">{{ saveMessage }}</div>
     </div>
   } @else {

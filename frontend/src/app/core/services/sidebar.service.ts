@@ -50,6 +50,7 @@ export class SidebarService {
   setObjectives(): void {
     this.title.set('OBJETIVOS');
     this.items.set([
+      { label: 'OBJETIVOS', route: '/objectives' },
       { label: 'PRESUPUESTO', route: '/objectives/budget' },
     ]);
   }

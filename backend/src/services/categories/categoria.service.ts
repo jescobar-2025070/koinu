@@ -31,6 +31,11 @@ export class CategoriaService {
         statusCode: 400,
       });
     }
+    await this.assertNameAvailable(
+      (uid, categoryName) => this.ingresoRepository.findActiveByName(uid, categoryName),
+      userId,
+      name,
+    );
     return this.ingresoRepository.create({ userId, name });
   }
 
@@ -42,6 +47,11 @@ export class CategoriaService {
         statusCode: 400,
       });
     }
+    await this.assertNameAvailable(
+      (uid, categoryName) => this.gastoRepository.findActiveByName(uid, categoryName),
+      userId,
+      name,
+    );
     return this.gastoRepository.create({ userId, name });
   }
 
@@ -54,6 +64,12 @@ export class CategoriaService {
       });
     }
     await this.assertOwnedIngreso(userId, id);
+    await this.assertNameAvailable(
+      (uid, categoryName) => this.ingresoRepository.findActiveByName(uid, categoryName),
+      userId,
+      trimmed,
+      id,
+    );
     const updated = await this.ingresoRepository.update(id, trimmed);
     if (!updated) {
       throw new AppError(ErrorCodes.INTERNAL_ERROR, {
@@ -73,6 +89,12 @@ export class CategoriaService {
       });
     }
     await this.assertOwnedGasto(userId, id);
+    await this.assertNameAvailable(
+      (uid, categoryName) => this.gastoRepository.findActiveByName(uid, categoryName),
+      userId,
+      trimmed,
+      id,
+    );
     const updated = await this.gastoRepository.update(id, trimmed);
     if (!updated) {
       throw new AppError(ErrorCodes.INTERNAL_ERROR, {
@@ -135,6 +157,21 @@ export class CategoriaService {
       throw new AppError(ErrorCodes.FORBIDDEN, {
         message: 'No tienes acceso a esta categoría.',
         statusCode: 403,
+      });
+    }
+  }
+
+  private async assertNameAvailable(
+    findActiveByName: (userId: string, name: string) => Promise<CategoriaIngreso | CategoriaGasto | null>,
+    userId: string,
+    name: string,
+    excludeId?: string,
+  ): Promise<void> {
+    const existing = await findActiveByName(userId, name);
+    if (existing && existing.id !== excludeId) {
+      throw new AppError(ErrorCodes.CATEGORY_ALREADY_EXISTS, {
+        message: 'Ya existe una categoría con ese nombre.',
+        statusCode: 409,
       });
     }
   }

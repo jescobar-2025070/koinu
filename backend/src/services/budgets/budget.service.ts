@@ -1,13 +1,11 @@
-import { Db, pool, withTransaction } from '../../config/db';
+import { pool, withTransaction } from '../../config/db';
 import { AppError } from '../../errors/app-error';
 import { ErrorCodes } from '../../errors/error-codes';
 import { Presupuesto } from '../../entities/presupuesto.entity';
 import { AsignacionPresupuesto } from '../../entities/asignacion-presupuesto.entity';
-import { ExcedentePresupuesto } from '../../entities/excedente-presupuesto.entity';
 import { PeriodoService } from '../periods/periodo.service';
 import { PresupuestoRepository } from '../../repositories/presupuesto.repository';
 import { AsignacionPresupuestoRepository } from '../../repositories/asignacion-presupuesto.repository';
-import { ExcedentePresupuestoRepository } from '../../repositories/excedente-presupuesto.repository';
 import { CategoriaGastoRepository } from '../../repositories/categoria-gasto.repository';
 import { MovimientoRepository } from '../../repositories/movimiento.repository';
 
@@ -15,14 +13,12 @@ export interface PresupuestoConAsignaciones {
   presupuesto: Presupuesto | null;
   asignaciones: AsignacionPresupuesto[];
   asignadoTotal: number;
-  excedenteTotal: number;
 }
 
 export class BudgetService {
   private readonly periodoService: PeriodoService;
   private readonly presupuestoRepository: PresupuestoRepository;
   private readonly asignacionRepository: AsignacionPresupuestoRepository;
-  private readonly excedenteRepository: ExcedentePresupuestoRepository;
   private readonly categoriaGastoRepository: CategoriaGastoRepository;
   private readonly movimientoRepository: MovimientoRepository;
 
@@ -30,7 +26,6 @@ export class BudgetService {
     this.periodoService = new PeriodoService();
     this.presupuestoRepository = new PresupuestoRepository(pool);
     this.asignacionRepository = new AsignacionPresupuestoRepository(pool);
-    this.excedenteRepository = new ExcedentePresupuestoRepository(pool);
     this.categoriaGastoRepository = new CategoriaGastoRepository(pool);
     this.movimientoRepository = new MovimientoRepository(pool);
   }
@@ -38,27 +33,60 @@ export class BudgetService {
   async getBudget(periodoId: string, userId: string): Promise<PresupuestoConAsignaciones> {
     await this.assertPeriodOwnership(periodoId, userId);
 
-    let presupuesto = await this.presupuestoRepository.findByPeriodo(periodoId);
-    const totalAmount = await this.netIncomeOf(periodoId);
-
-    if (!presupuesto) {
-      presupuesto = await this.presupuestoRepository.create({
-        periodoId,
-        totalAmount,
-      });
+    const presupuesto = await this.presupuestoRepository.findByPeriodo(periodoId);
+    if (presupuesto) {
+      presupuesto.totalAmount = await this.netIncomeOf(periodoId);
     }
-    presupuesto.totalAmount = totalAmount;
 
-    const asignaciones = await this.asignacionRepository.findByPresupuesto(presupuesto.id);
+    const asignaciones = presupuesto
+      ? await this.asignacionRepository.findByPresupuesto(presupuesto.id)
+      : [];
     const asignadoTotal = asignaciones.reduce((sum, a) => sum + Number(a.amount), 0);
-    const excedenteTotal = await this.excedenteRepository.findTotalByPresupuesto(presupuesto.id);
 
     return {
       presupuesto,
       asignaciones,
       asignadoTotal,
-      excedenteTotal,
     };
+  }
+
+  async syncBudget(periodoId: string, userId: string): Promise<Presupuesto> {
+    await this.assertPeriodOwnership(periodoId, userId);
+
+    const totalAmount = await this.netIncomeOf(periodoId);
+
+    return withTransaction(async (client) => {
+      const presupuestoRepo = new PresupuestoRepository(client);
+      const existing = await presupuestoRepo.findByPeriodo(periodoId);
+      if (existing) {
+        const updated = await presupuestoRepo.update(existing.id, totalAmount);
+        if (!updated) {
+          throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+            message: 'Error al actualizar el presupuesto.',
+            statusCode: 500,
+          });
+        }
+        return updated;
+      }
+
+      try {
+        return await presupuestoRepo.create({ periodoId, totalAmount });
+      } catch (error) {
+        const isDuplicate = typeof error === 'object' && error !== null && (error as any).code === '23505';
+        if (!isDuplicate) {
+          throw error;
+        }
+        const concurrent = await presupuestoRepo.findByPeriodo(periodoId);
+        if (!concurrent) {
+          throw error;
+        }
+        const updated = await presupuestoRepo.update(concurrent.id, totalAmount);
+        if (!updated) {
+          throw error;
+        }
+        return updated;
+      }
+    });
   }
 
   private async netIncomeOf(periodoId: string): Promise<number> {
@@ -207,62 +235,6 @@ export class BudgetService {
         statusCode: 500,
       });
     }
-  }
-
-  async getOverruns(periodoId: string, userId: string): Promise<{
-    excedenteTotal: number;
-    excedentes: ExcedentePresupuesto[];
-  }> {
-    await this.assertPeriodOwnership(periodoId, userId);
-
-    const presupuesto = await this.presupuestoRepository.findByPeriodo(periodoId);
-    if (!presupuesto) {
-      return { excedenteTotal: 0, excedentes: [] };
-    }
-
-    const excedentes = await this.excedenteRepository.findByPresupuesto(presupuesto.id);
-    return {
-      excedenteTotal: excedentes.reduce((sum, e) => sum + Number(e.amount), 0),
-      excedentes,
-    };
-  }
-
-  async registerOverrunIfNeeded(periodoId: string, movimientoId: string): Promise<void> {
-    return this.registerOverrun(pool, periodoId, movimientoId);
-  }
-
-  async registerOverrun(db: Db, periodoId: string, movimientoId: string): Promise<void> {
-    const presupuestoRepo = new PresupuestoRepository(db);
-    const excedenteRepo = new ExcedentePresupuestoRepository(db);
-    const movimientoRepo = new MovimientoRepository(db);
-
-    const presupuesto = await presupuestoRepo.findByPeriodo(periodoId);
-    if (!presupuesto) {
-      return;
-    }
-
-    const stats = await movimientoRepo.getStatsByPeriodo(periodoId);
-    const excedentes = await excedenteRepo.findByPresupuesto(presupuesto.id);
-    const yaRegistrado = excedentes.some((e) => e.movimientoId === movimientoId);
-    if (yaRegistrado) {
-      return;
-    }
-
-    const sobrepasoPrevio = excedentes.reduce((sum, e) => sum + Number(e.amount), 0);
-    const incremento = Math.max(
-      0,
-      stats.totalGastos - Number(stats.totalIngresos) - sobrepasoPrevio,
-    );
-
-    if (incremento <= 0) {
-      return;
-    }
-
-    await excedenteRepo.create({
-      presupuestoId: presupuesto.id,
-      movimientoId,
-      amount: incremento,
-    });
   }
 
   private async assertPeriodOwnership(periodoId: string, userId: string): Promise<void> {

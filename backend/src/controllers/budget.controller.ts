@@ -30,6 +30,16 @@ export class BudgetController {
     }
   };
 
+  syncBudget = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = this.requireUser(req);
+      const presupuesto = await this.budgetService.syncBudget(req.params.periodId, userId);
+      res.status(200).json({ presupuesto });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   listAllocations = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = this.requireUser(req);
@@ -74,16 +84,6 @@ export class BudgetController {
       const userId = this.requireUser(req);
       await this.budgetService.deleteAllocation(req.params.id, userId);
       res.status(204).end();
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  getOverruns = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const userId = this.requireUser(req);
-      const overruns = await this.budgetService.getOverruns(req.params.periodId, userId);
-      res.status(200).json(overruns);
     } catch (error) {
       next(error);
     }

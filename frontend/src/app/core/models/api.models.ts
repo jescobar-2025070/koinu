@@ -12,7 +12,13 @@ export interface Periodo {
   deletedAt: string | null;
 }
 
+export interface AdminPeriod extends Periodo {
+  userEmail: string;
+}
+
 export type MovimientoType = 'INCOME' | 'EXPENSE';
+export type IncomeClassification = 'REGULAR' | 'OCASIONAL';
+export type ExpenseType = 'FIJO' | 'VARIABLE';
 
 export interface Movimiento {
   id: string;
@@ -21,8 +27,11 @@ export interface Movimiento {
   type: MovimientoType;
   incomeCategoryId: string | null;
   expenseCategoryId: string | null;
+  objetivoId: string | null;
   amount: number;
   description: string | null;
+  incomeClassification: IncomeClassification | null;
+  expenseType: ExpenseType | null;
   date: string;
   createdAt: string;
   updatedAt: string;
@@ -47,6 +56,7 @@ export interface Categoria {
 }
 
 export type ObjetivoStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type ObjetivoPriority = 'ALTA' | 'MEDIA' | 'BAJA';
 
 export interface Objetivo {
   id: string;
@@ -58,6 +68,7 @@ export interface Objetivo {
   currentAmount: number;
   deadline: string | null;
   startDate: string | null;
+  priority: ObjetivoPriority;
   status: ObjetivoStatus;
   createdAt: string;
   updatedAt: string;
@@ -79,24 +90,10 @@ export interface AsignacionPresupuesto {
   createdAt: string;
 }
 
-export interface ExcedentePresupuesto {
-  id: string;
-  presupuestoId: string;
-  movimientoId: string;
-  amount: number;
-  createdAt: string;
-}
-
 export interface BudgetData {
   presupuesto: Presupuesto | null;
   asignaciones: AsignacionPresupuesto[];
   asignadoTotal: number;
-  excedenteTotal: number;
-}
-
-export interface OverrunsData {
-  excedenteTotal: number;
-  excedentes: ExcedentePresupuesto[];
 }
 
 export interface MovimientoStats {
@@ -128,7 +125,6 @@ export interface DashboardData {
     id: string;
     totalAmount: number;
     asignadoTotal: number;
-    excedenteTotal: number;
     asignaciones: AsignacionPresupuesto[];
   } | null;
   disponiblePorPresupuesto: number | null;
@@ -141,6 +137,7 @@ export interface ReportCategoryRow {
   nombre: string;
   tipo: MovimientoType;
   total: number;
+  presupuestado: number | null;
 }
 
 export interface ReportData {
@@ -158,7 +155,6 @@ export interface ReportData {
     total: number;
     asignado: number;
     disponible: number;
-    excedente: number;
   } | null;
   porCategoria: ReportCategoryRow[];
   objetivos: {
@@ -169,6 +165,7 @@ export interface ReportData {
     progress: number;
     status: string;
   }[];
+  recomendaciones: string[];
   generadoEn: string;
 }
 
@@ -177,4 +174,41 @@ export interface SystemHealth {
   db: string;
   uptimeSeconds: number;
   timestamp: string;
+}
+
+export interface TratamientoFiscal {
+  id: string;
+  name: string;
+  rate: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type MovimientoAuditoriaTipo = 'CREADO' | 'MODIFICADO' | 'ELIMINADO';
+
+export interface MovimientoAuditoria {
+  id: string;
+  movimientoId: string;
+  periodoId: string;
+  userId: string;
+  tipo: MovimientoAuditoriaTipo;
+  resumen: {
+    movimiento?: {
+      type: MovimientoType;
+      amount: number;
+      description: string | null;
+      date: string;
+      incomeClassification?: IncomeClassification | null;
+      expenseType?: ExpenseType | null;
+    };
+    detalle?: {
+      grossAmount: number;
+      retentionAmount: number;
+      netAmount: number;
+    };
+    antes?: Record<string, unknown>;
+    despues?: Record<string, unknown>;
+    cambios?: Record<string, [unknown, unknown]>;
+  };
+  createdAt: string;
 }

@@ -97,4 +97,22 @@ export class PeriodoController {
       next(error);
     }
   };
+
+  listAdmin = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const periodos = await this.periodoService.listForAdmin();
+      res.status(200).json({ periodos });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  cancelAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const periodo = await this.periodoService.cancelForAdmin(req.params.id);
+      res.status(200).json({ periodo });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

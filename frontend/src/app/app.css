@@ -66,6 +66,10 @@
 .topnav a.active {
   color: #fff;
   font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--cyan);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
 }
 
 .topnav a:hover {
@@ -168,6 +172,10 @@
 .side-item.active {
   color: #fff;
   font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--cyan);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
 .side-item:hover {
@@ -213,6 +221,16 @@
   color: var(--text-dim);
 }
 
+.profile-card > div {
+  min-width: 0;
+}
+
+.profile-name,
+.profile-email {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /* ============================================================
    Main Panel - glass container
    ============================================================ */
@@ -226,7 +244,8 @@
   padding: 40px 44px;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -248,6 +267,7 @@
 .copyright {
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.6);
+  text-align: left;
 }
 
 .legal-pill {
@@ -264,29 +284,6 @@
   gap: 10px 18px;
   min-width: 0;
 }
-
-/* ============================================================
-   Shared view classes
-   ============================================================ */
-.stat-label {
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #fff;
-  margin-bottom: 14px;
-}
-
-.stat-value {
-  font-size: clamp(1.5rem, 3.6vw, 2.4rem);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  line-height: 1.15;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.stat-value.cyan { color: var(--cyan); }
-.stat-value.green { color:  #79cd79; }
 
 /* ============================================================
    Responsive
@@ -311,6 +308,10 @@
 
   .topbar {
     padding: 14px 24px;
+  }
+
+  .footer-row {
+    padding: 0 24px 12px;
   }
 }
 
@@ -350,7 +351,6 @@
   }
 
   .footer-row {
-    justify-content: center;
     padding: 0 16px 16px;
   }
 }

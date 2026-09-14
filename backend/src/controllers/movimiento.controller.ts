@@ -39,10 +39,13 @@ export class MovimientoController {
         type: req.body.type,
         incomeCategoryId: req.body.incomeCategoryId,
         expenseCategoryId: req.body.expenseCategoryId,
+        objetivoId: req.body.objetivoId,
         grossAmount: req.body.grossAmount,
         retentionAmount: req.body.retentionAmount,
         taxTreatmentId: req.body.taxTreatmentId,
         amount: req.body.amount,
+        incomeClassification: req.body.incomeClassification,
+        expenseType: req.body.expenseType,
         description: req.body.description,
         date: req.body.date,
       };

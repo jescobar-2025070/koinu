@@ -1,7 +1,9 @@
 import { ChangeDetectorRef, Component, inject, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
+import { DialogService } from '../../../../core/services/dialog.service';
 import { Periodo } from '../../../../core/models/api.models';
 
 @Component({
@@ -13,6 +15,8 @@ export class PeriodsFinalize implements OnInit {
   private readonly sidebarService = inject(SidebarService);
   private readonly periodoService = inject(PeriodoService);
   private readonly movimientoService = inject(MovimientoService);
+  private readonly dialogService = inject(DialogService);
+  private readonly router = inject(Router);
   private readonly cdr = inject(ChangeDetectorRef);
 
   currentPeriod: Periodo | null = null;
@@ -22,6 +26,8 @@ export class PeriodsFinalize implements OnInit {
   totalGastos = 0;
   saveMessage = '';
   finalizing = false;
+  finalized = false;
+  finalizedName = '';
 
   ngOnInit(): void {
     this.sidebarService.setPeriods();
@@ -58,14 +64,24 @@ export class PeriodsFinalize implements OnInit {
 
   async finalizePeriod(): Promise<void> {
     if (!this.currentPeriod) return;
+    const confirmed = await this.dialogService.confirm({
+      title: 'FINALIZAR PERÍODO',
+      message: `¿Finalizar "${this.currentPeriod.name}"? Se guardará el informe final y el período dejará de estar activo.`,
+      confirmLabel: 'Finalizar',
+      danger: true,
+    });
+    if (!confirmed) return;
     this.finalizing = true;
     this.saveMessage = '';
     try {
       await this.periodoService.finalize(this.currentPeriod.id);
+      this.finalizedName = this.currentPeriod.name;
       this.saveMessage = '✓ Período finalizado';
       this.currentPeriod = null;
+      this.finalized = true;
     } catch (e: any) {
       this.saveMessage = '✗ ' + (e?.error?.error?.message ?? 'Error al finalizar');
+      this.finalized = false;
     } finally {
       this.finalizing = false;
       this.cdr.markForCheck();
@@ -74,5 +90,13 @@ export class PeriodsFinalize implements OnInit {
         this.cdr.markForCheck();
       }, 3000);
     }
+  }
+
+  goNewPeriod(): void {
+    void this.router.navigateByUrl('/periods/new');
+  }
+
+  goHistory(): void {
+    void this.router.navigateByUrl('/periods/history');
   }
 }

@@ -3,10 +3,43 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, from, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
+import { isTerminalSessionError } from '../auth/auth.models';
+
+function isRefreshExempt(url: string): boolean {
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/register') ||
+    url.includes('/auth/google') ||
+    url.includes('/auth/refresh')
+  );
+}
+
+function isPublicPage(url: string): boolean {
+  const path = url.split('?')[0];
+  return (
+    path === '' ||
+    path === '/' ||
+    path === '/login' ||
+    path === '/register' ||
+    path === '/forgot-password' ||
+    path === '/reset-password'
+  );
+}
 
 export const authErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const router = inject(Router);
+
+  if (isRefreshExempt(req.url)) {
+    return next(req).pipe(
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 401 && isTerminalSessionError(error)) {
+          authService.handleSessionEnded();
+        }
+        return throwError(() => error);
+      }),
+    );
+  }
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
@@ -14,33 +47,33 @@ export const authErrorInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       }
 
-      const isAuthEndpoint = req.url.includes('/auth/');
-      const errorCode = (error.error as any)?.error?.code;
-      const hasRefreshToken = !!authService.getRefreshToken();
-
-      if (!isAuthEndpoint && hasRefreshToken) {
-        return from(authService.refreshSession()).pipe(
-          switchMap((ok) => {
-            if (!ok) {
-              return throwError(() => error);
-            }
-            return next(req);
-          }),
-          catchError(() => {
-            authService.clearSession();
+      if (!authService.getRefreshToken()) {
+        if (isTerminalSessionError(error)) {
+          authService.handleSessionEnded();
+        } else {
+          authService.clearSession();
+          if (!isPublicPage(router.url)) {
             void router.navigate(['/login']);
-            return throwError(() => error);
-          }),
-        );
+          }
+        }
+        return throwError(() => error);
       }
 
-      if (errorCode === 'TOKEN_EXPIRED') {
-        authService.markSessionExpired();
-      } else if (!isAuthEndpoint) {
-        authService.clearSession();
-        void router.navigate(['/login']);
-      }
-      return throwError(() => error);
+      return from(authService.refreshSession()).pipe(
+        switchMap((ok) => {
+          if (!ok) {
+            return throwError(() => error);
+          }
+          return next(req).pipe(
+            catchError((retryError: HttpErrorResponse) => {
+              if (isTerminalSessionError(retryError)) {
+                authService.handleSessionEnded();
+              }
+              return throwError(() => retryError);
+            }),
+          );
+        }),
+      );
     }),
   );
 };

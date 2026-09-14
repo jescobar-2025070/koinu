@@ -8,7 +8,6 @@ import { PeriodoRepository } from '../../repositories/periodo.repository';
 import { MovimientoRepository } from '../../repositories/movimiento.repository';
 import { PresupuestoRepository } from '../../repositories/presupuesto.repository';
 import { AsignacionPresupuestoRepository } from '../../repositories/asignacion-presupuesto.repository';
-import { ExcedentePresupuestoRepository } from '../../repositories/excedente-presupuesto.repository';
 import { ObjetivoRepository } from '../../repositories/objetivo.repository';
 import { SnapshotInformeRepository } from '../../repositories/snapshot-informe.repository';
 
@@ -17,6 +16,7 @@ export interface ReportCategoryRow {
   nombre: string;
   tipo: MovimientoType;
   total: number;
+  presupuestado: number | null;
 }
 
 export interface ReportData {
@@ -34,7 +34,6 @@ export interface ReportData {
     total: number;
     asignado: number;
     disponible: number;
-    excedente: number;
   } | null;
   porCategoria: ReportCategoryRow[];
   objetivos: {
@@ -45,6 +44,7 @@ export interface ReportData {
     progress: number;
     status: string;
   }[];
+  recomendaciones: string[];
   generadoEn: Date;
 }
 
@@ -125,7 +125,6 @@ export class ReportService {
     const movimientoRepo = new MovimientoRepository(db);
     const presupuestoRepo = new PresupuestoRepository(db);
     const asignacionRepo = new AsignacionPresupuestoRepository(db);
-    const excedenteRepo = new ExcedentePresupuestoRepository(db);
     const objetivoRepo = new ObjetivoRepository(db);
 
     const stats = await movimientoRepo.getStatsByPeriodo(periodo.id);
@@ -133,29 +132,34 @@ export class ReportService {
     const totalGastos = Number(stats.totalGastos);
     const disponible = totalIngresos - totalGastos;
 
-    const porCategoria: ReportCategoryRow[] = (
-      await movimientoRepo.getCategoryBreakdown(periodo.id)
-    ).map((row) => ({
-      categoriaId: row.categoryId,
-      nombre: row.nombre,
-      tipo: row.type,
-      total: row.total,
-    }));
+    const porCategoriaBase = await movimientoRepo.getCategoryBreakdown(periodo.id);
 
     const presupuesto = await presupuestoRepo.findByPeriodo(periodo.id);
     let presupuestoInfo: ReportData['presupuesto'] = null;
-    let excedente = 0;
+    const asignacionPorCategoria: Record<string, number> = {};
     if (presupuesto) {
       const asignaciones = await asignacionRepo.findByPresupuesto(presupuesto.id);
       const asignado = asignaciones.reduce((s, a) => s + Number(a.amount), 0);
-      excedente = await excedenteRepo.findTotalByPresupuesto(presupuesto.id);
+      for (const asignacion of asignaciones) {
+        asignacionPorCategoria[asignacion.categoriaGastoId] = Number(asignacion.amount);
+      }
       presupuestoInfo = {
         total: totalIngresos,
         asignado,
         disponible: Math.max(0, totalIngresos - totalGastos),
-        excedente: Number(excedente),
       };
     }
+
+    const porCategoria: ReportCategoryRow[] = porCategoriaBase.map((row) => ({
+      categoriaId: row.categoryId,
+      nombre: row.nombre,
+      tipo: row.type,
+      total: row.total,
+      presupuestado:
+        row.type === 'EXPENSE' && row.categoryId !== null
+          ? (asignacionPorCategoria[row.categoryId] ?? null)
+          : null,
+    }));
 
     const objetivos = await objetivoRepo.findForReport(userId, periodo.id);
     const objetivosInfo = objetivos.map((o: Objetivo) => ({
@@ -166,6 +170,12 @@ export class ReportService {
       progress: o.targetAmount > 0 ? Math.round((o.currentAmount / o.targetAmount) * 100) : 0,
       status: o.status,
     }));
+
+    const recomendaciones = this.buildRecomendaciones({
+      presupuesto: presupuestoInfo,
+      disponible,
+      objetivos: objetivosInfo,
+    });
 
     return {
       periodo: {
@@ -181,7 +191,36 @@ export class ReportService {
       presupuesto: presupuestoInfo,
       porCategoria,
       objetivos: objetivosInfo,
+      recomendaciones,
       generadoEn: new Date(),
     };
+  }
+
+  private buildRecomendaciones(params: {
+    presupuesto: ReportData['presupuesto'];
+    disponible: number;
+    objetivos: ReportData['objetivos'];
+  }): string[] {
+    const recomendaciones: string[] = [];
+
+    if (params.presupuesto) {
+      recomendaciones.push(
+        'Te mantienes dentro de tu presupuesto general. Sigue registrando tus gastos para mantener el control.',
+      );
+    } else {
+      recomendaciones.push(
+        'Aún no has definido un presupuesto para este período. Defínelo para fijar un límite general de gasto.',
+      );
+    }
+
+    const objetivosPendientes = params.objetivos.filter((o) => o.progress < 100);
+    if (params.disponible > 0 && objetivosPendientes.length > 0) {
+      recomendaciones.push('Considera apartar una parte de tu ingreso disponible para tus objetivos.');
+    }
+    if (params.objetivos.some((o) => o.progress >= 100)) {
+      recomendaciones.push('Alcanzaste la meta de al menos un objetivo. ¡Buen manejo de tus finanzas personales!');
+    }
+
+    return recomendaciones;
   }
 }

@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from './api.service';
-import { DetalleIngreso, Movimiento, MovimientoStats } from '../models/api.models';
+import { DetalleIngreso, ExpenseType, IncomeClassification, Movimiento, MovimientoStats } from '../models/api.models';
 
 @Injectable({ providedIn: 'root' })
 export class MovimientoService {
@@ -18,10 +18,13 @@ export class MovimientoService {
     type: 'INCOME' | 'EXPENSE';
     incomeCategoryId?: string;
     expenseCategoryId?: string;
+    objetivoId?: string;
     grossAmount?: number;
     retentionAmount?: number;
     taxTreatmentId?: string;
     amount?: number;
+    incomeClassification?: IncomeClassification;
+    expenseType?: ExpenseType;
     description?: string;
     date?: string;
   }): Promise<{ movimiento: Movimiento; detalle?: DetalleIngreso }> {
@@ -32,9 +35,25 @@ export class MovimientoService {
     await firstValueFrom(this.api.delete(`/movements/${id}`));
   }
 
+  async getById(
+    id: string,
+  ): Promise<{ movimiento: Movimiento; detalle?: DetalleIngreso } | null> {
+    return await firstValueFrom(this.api.get<{ movimiento: Movimiento; detalle?: DetalleIngreso }>(`/movements/${id}`));
+  }
+
   async update(
     id: string,
-    data: { amount?: number; description?: string; date?: string },
+    data: {
+      amount?: number;
+      description?: string;
+      date?: string;
+      grossAmount?: number;
+      retentionAmount?: number;
+      taxTreatmentId?: string;
+      incomeClassification?: IncomeClassification;
+      expenseType?: ExpenseType;
+      objetivoId?: string | null;
+    },
   ): Promise<Movimiento> {
     const res = await firstValueFrom(this.api.put<{ movimiento: Movimiento }>(`/movements/${id}`, data));
     return res.movimiento;

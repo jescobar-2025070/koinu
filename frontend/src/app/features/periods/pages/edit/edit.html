@@ -15,7 +15,7 @@
     </div>
   </div>
   <div class="form-highlight">
-    <button class="btn-primary" style="max-width:260px;" (click)="saveChanges()" [disabled]="saving || !currentPeriod">Guardar Cambios</button>
+    <button class="btn-primary" (click)="saveChanges()" [disabled]="saving || !currentPeriod">Guardar Cambios</button>
     <div class="save-msg">{{ saveMessage }}</div>
   </div>
 </div>

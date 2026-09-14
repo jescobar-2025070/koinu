@@ -28,7 +28,6 @@ export interface DashboardData {
     id: string;
     totalAmount: number;
     asignadoTotal: number;
-    excedenteTotal: number;
     asignaciones: AsignacionPresupuesto[];
   } | null;
   disponiblePorPresupuesto: number | null;
@@ -82,7 +81,6 @@ export class DashboardService {
           id: budget.presupuesto.id,
           totalAmount: Number(budget.presupuesto.totalAmount),
           asignadoTotal: budget.asignadoTotal,
-          excedenteTotal: budget.excedenteTotal,
           asignaciones: budget.asignaciones,
         }
       : null;

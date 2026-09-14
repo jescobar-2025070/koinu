@@ -111,7 +111,14 @@
 }
 
 @media (max-width: 768px) {
-  .grid-2x2-top {
+.overview-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.grid-2x2-top {
     grid-template-columns: 1fr;
   }
 }
@@ -183,23 +190,4 @@
 .draft-range {
   font-size: 0.78rem;
   color: var(--text-dim2);
-}
-
-.draft-btn {
-  width: auto;
-  padding: 10px 22px;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: linear-gradient(180deg, #6fb3ff 0%, #2f6fd6 100%);
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.9rem;
-  box-shadow: 0 6px 20px rgba(45, 110, 220, 0.5);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  cursor: pointer;
-}
-
-.draft-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(45, 110, 220, 0.6);
 }

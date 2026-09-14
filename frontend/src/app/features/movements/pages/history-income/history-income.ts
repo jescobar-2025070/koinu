@@ -3,7 +3,9 @@ import { FormsModule } from '@angular/forms';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { MovimientoService } from '../../../../core/services/movimiento.service';
 import { CategoriaService } from '../../../../core/services/categoria.service';
-import { Movimiento, Categoria } from '../../../../core/models/api.models';
+import { TratamientoFiscalService } from '../../../../core/services/tratamiento-fiscal.service';
+import { ObjetivoService } from '../../../../core/services/objetivo.service';
+import { Movimiento, Categoria, TratamientoFiscal, IncomeClassification, Objetivo } from '../../../../core/models/api.models';
 
 @Component({
   selector: 'app-movements-history-income',
@@ -15,12 +17,24 @@ export class MovementsHistoryIncome implements OnInit {
   private readonly sidebarService = inject(SidebarService);
   private readonly movimientoService = inject(MovimientoService);
   private readonly categoriaService = inject(CategoriaService);
+  private readonly tratamientoFiscalService = inject(TratamientoFiscalService);
+  private readonly objetivoService = inject(ObjetivoService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   movements: Movimiento[] = [];
   private categories: Categoria[] = [];
+  tratamientos: TratamientoFiscal[] = [];
+  objetivos: Objetivo[] = [];
+  objetivosActivos: Objetivo[] = [];
   editingIndex: number | null = null;
-  editData = { description: '', amount: 0 };
+  editData = {
+    description: '',
+    grossAmount: 0,
+    retentionAmount: 0,
+    taxTreatmentId: '',
+    incomeClassification: 'REGULAR' as IncomeClassification,
+    objetivoId: null as string | null,
+  };
 
   ngOnInit(): void {
     this.sidebarService.setMovements();
@@ -29,11 +43,16 @@ export class MovementsHistoryIncome implements OnInit {
 
   private async loadData(): Promise<void> {
     try {
-      const [movimientos, categorias] = await Promise.all([
+      const [movimientos, categorias, tratamientos, objetivos] = await Promise.all([
         this.movimientoService.list(),
         this.categoriaService.listIncome(),
+        this.tratamientoFiscalService.list().catch(() => []),
+        this.objetivoService.list().catch(() => []),
       ]);
       this.categories = categorias;
+      this.tratamientos = tratamientos;
+      this.objetivos = objetivos;
+      this.objetivosActivos = objetivos.filter((o) => o.status === 'ACTIVE');
       this.movements = movimientos.filter((m) => m.type === 'INCOME');
       this.cdr.markForCheck();
     } catch (e) {
@@ -43,6 +62,13 @@ export class MovementsHistoryIncome implements OnInit {
 
   getCategoryName(id: string | null): string {
     return this.categories.find((c) => c.id === id)?.name ?? '—';
+  }
+
+  getObjetivoName(id: string | null): string {
+    if (!id) {
+      return '—';
+    }
+    return this.objetivos.find((o) => o.id === id)?.name ?? '—';
   }
 
   formatCurrency(amount: number): string {
@@ -55,23 +81,61 @@ export class MovementsHistoryIncome implements OnInit {
   }
 
   editMovement(index: number): void {
+    const movement = this.movements[index];
     this.editingIndex = index;
     this.editData = {
-      description: this.movements[index].description ?? '',
-      amount: this.movements[index].amount,
+      description: movement.description ?? '',
+      grossAmount: movement.amount,
+      retentionAmount: 0,
+      taxTreatmentId: this.tratamientos[0]?.id ?? '',
+      incomeClassification: movement.incomeClassification ?? 'REGULAR',
+      objetivoId: movement.objetivoId,
     };
+    void this.movimientoService.getById(movement.id).then((res) => {
+      if (res?.detalle) {
+        this.editData.grossAmount = res.detalle.grossAmount;
+        this.editData.retentionAmount = res.detalle.retentionAmount;
+        this.editData.taxTreatmentId = res.detalle.taxTreatmentId ?? this.editData.taxTreatmentId;
+      }
+      if (res?.movimiento) {
+        this.editData.objetivoId = res.movimiento.objetivoId;
+      }
+      this.cdr.markForCheck();
+    });
+    this.cdr.markForCheck();
+  }
+
+  get editNeto(): number {
+    return this.editData.grossAmount - this.editData.retentionAmount;
+  }
+
+  applyTreatmentRate(): void {
+    const treatment = this.tratamientos.find((t) => t.id === this.editData.taxTreatmentId);
+    if (treatment) {
+      this.editData.retentionAmount = Math.round(this.editData.grossAmount * treatment.rate * 100) / 100;
+    }
     this.cdr.markForCheck();
   }
 
   async saveEdit(movement: Movimiento): Promise<void> {
     try {
       const updated = await this.movimientoService.update(movement.id, {
-        amount: this.editData.amount,
+        grossAmount: this.editData.grossAmount,
+        retentionAmount: this.editData.retentionAmount,
+        taxTreatmentId: this.editData.taxTreatmentId || undefined,
+        incomeClassification: this.editData.incomeClassification,
         description: this.editData.description,
+        objetivoId: this.editData.objetivoId,
       });
       const idx = this.movements.findIndex((m) => m.id === movement.id);
       if (idx !== -1) {
-        this.movements[idx] = { ...this.movements[idx], amount: updated.amount, description: updated.description };
+        this.movements[idx] = {
+          ...this.movements[idx],
+          amount: updated.amount,
+          description: updated.description,
+          incomeClassification: updated.incomeClassification,
+          objetivoId: updated.objetivoId,
+        };
       }
       this.cdr.markForCheck();
     } catch (e) {

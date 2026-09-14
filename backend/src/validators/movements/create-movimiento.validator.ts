@@ -1,14 +1,18 @@
 import { ValidationResult, validationFailure, validationSuccess } from '../validator-result';
+import { isAmountTooLarge, MAX_AMOUNT_FORMATTED } from '../../utils/amount.utils';
 
 interface CreateMovimientoRequest {
   periodId: string;
   type: 'INCOME' | 'EXPENSE';
   incomeCategoryId?: string;
   expenseCategoryId?: string;
+  objetivoId?: string;
   grossAmount?: number;
   retentionAmount?: number;
   taxTreatmentId?: string;
   amount?: number;
+  incomeClassification?: string;
+  expenseType?: string;
   description?: string;
   date?: string;
 }
@@ -21,7 +25,10 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
   const type = typeof data.type === 'string' ? data.type.trim().toUpperCase() : '';
   const incomeCategoryId = typeof data.incomeCategoryId === 'string' ? data.incomeCategoryId.trim() : undefined;
   const expenseCategoryId = typeof data.expenseCategoryId === 'string' ? data.expenseCategoryId.trim() : undefined;
+  const objetivoId = typeof data.objetivoId === 'string' ? data.objetivoId.trim() : undefined;
   const taxTreatmentId = typeof data.taxTreatmentId === 'string' ? data.taxTreatmentId.trim() : undefined;
+  const incomeClassification = typeof data.incomeClassification === 'string' ? data.incomeClassification.trim().toUpperCase() : '';
+  const expenseType = typeof data.expenseType === 'string' ? data.expenseType.trim().toUpperCase() : '';
   const description = typeof data.description === 'string' ? data.description.trim() : undefined;
   const date = typeof data.date === 'string' ? data.date.trim() : undefined;
 
@@ -43,8 +50,15 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
     if (!incomeCategoryId) {
       errors.incomeCategoryId = 'La categoría de ingreso es obligatoria.';
     }
+    if (!incomeClassification) {
+      errors.incomeClassification = 'La clasificación del ingreso es obligatoria.';
+    } else if (!['REGULAR', 'OCASIONAL'].includes(incomeClassification)) {
+      errors.incomeClassification = 'La clasificación del ingreso debe ser REGULAR u OCASIONAL.';
+    }
     if (isNaN(grossAmount) || grossAmount <= 0) {
       errors.grossAmount = 'El monto bruto debe ser un número mayor a 0.';
+    } else if (isAmountTooLarge(grossAmount)) {
+      errors.grossAmount = `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`;
     }
     if (isNaN(retentionAmount) || retentionAmount < 0) {
       errors.retentionAmount = 'La retención debe ser un número mayor o igual a 0.';
@@ -53,8 +67,18 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
     if (!expenseCategoryId) {
       errors.expenseCategoryId = 'La categoría de gasto es obligatoria.';
     }
+    if (!expenseType) {
+      errors.expenseType = 'El tipo de gasto es obligatorio.';
+    } else if (!['FIJO', 'VARIABLE'].includes(expenseType)) {
+      errors.expenseType = 'El tipo de gasto debe ser FIJO o VARIABLE.';
+    }
     if (isNaN(amount) || amount <= 0) {
       errors.amount = 'El monto debe ser un número mayor a 0.';
+    } else if (isAmountTooLarge(amount)) {
+      errors.amount = `El monto no puede superar Q ${MAX_AMOUNT_FORMATTED}.`;
+    }
+    if (objetivoId) {
+      errors.objetivoId = 'Solo los ingresos pueden aportar a un objetivo.';
     }
   }
 
@@ -75,10 +99,13 @@ export function validateCreateMovimientoRequest(body: unknown): ValidationResult
     type: type as 'INCOME' | 'EXPENSE',
     incomeCategoryId,
     expenseCategoryId,
+    objetivoId: type === 'INCOME' ? objetivoId : undefined,
     grossAmount: type === 'INCOME' ? grossAmount : undefined,
     retentionAmount: type === 'INCOME' ? retentionAmount : undefined,
     taxTreatmentId,
     amount: type === 'EXPENSE' ? amount : undefined,
+    incomeClassification: type === 'INCOME' ? incomeClassification : undefined,
+    expenseType: type === 'EXPENSE' ? expenseType : undefined,
     description,
     date,
   });

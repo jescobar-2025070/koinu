@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { ObjetivoService } from '../../../../core/services/objetivo.service';
 import { PeriodoService } from '../../../../core/services/periodo.service';
-import { Objetivo } from '../../../../core/models/api.models';
+import { DialogService } from '../../../../core/services/dialog.service';
+import { Objetivo, ObjetivoPriority } from '../../../../core/models/api.models';
 
 @Component({
   selector: 'app-objectives-main',
@@ -15,21 +16,25 @@ export class ObjectivesMain implements OnInit {
   private readonly sidebarService = inject(SidebarService);
   private readonly objetivoService = inject(ObjetivoService);
   private readonly periodoService = inject(PeriodoService);
+  private readonly dialogService = inject(DialogService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   objetivos: Objetivo[] = [];
   periodNames = new Map<string, string>();
+  activePeriodId = '';
   showForm = false;
   formName = '';
   formDescription = '';
   formTarget = 0;
   formDeadline = '';
   formPeriodId: string | undefined;
+  formPriority: ObjetivoPriority = 'MEDIA';
   periodos: { id: string; name: string }[] = [
     { id: '', name: 'Objetivo general (sin período)' },
   ];
   saving = false;
   saveMessage = '';
+  actionMsg = '';
   transaccion: { id: string; amount: number; tipo: 'DEPOSIT' | 'WITHDRAW' } | null = null;
   transactionMsg = '';
 
@@ -45,6 +50,7 @@ export class ObjectivesMain implements OnInit {
         this.periodoService.list(),
       ]);
       this.objetivos = objetivos;
+      this.activePeriodId = periodos.find((p) => p.status === 'ACTIVE')?.id ?? '';
       this.periodNames = new Map(periodos.map((p) => [p.id, p.name]));
       this.periodos = [
         { id: '', name: 'Objetivo general (sin período)' },
@@ -99,9 +105,14 @@ export class ObjectivesMain implements OnInit {
     this.formDescription = '';
     this.formTarget = 0;
     this.formDeadline = '';
-    this.formPeriodId = '';
+    this.formPeriodId = this.activePeriodId;
+    this.formPriority = 'MEDIA';
     this.saveMessage = '';
     this.cdr.markForCheck();
+  }
+
+  priorityLabel(p: ObjetivoPriority): string {
+    return p === 'ALTA' ? 'Prioridad Alta' : p === 'BAJA' ? 'Prioridad Baja' : 'Prioridad Media';
   }
 
   async createObjetivo(): Promise<void> {
@@ -118,13 +129,14 @@ export class ObjectivesMain implements OnInit {
         description: this.formDescription.trim() || undefined,
         targetAmount: this.formTarget,
         deadline: this.formDeadline || undefined,
+        priority: this.formPriority,
       });
       this.saveMessage = 'Objetivo creado correctamente.';
       this.showForm = false;
       await this.loadData();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error creating objective:', e);
-      this.saveMessage = 'No se pudo crear el objetivo.';
+      this.saveMessage = e?.error?.error?.message || 'No se pudo crear el objetivo.';
     } finally {
       this.saving = false;
       this.cdr.markForCheck();
@@ -151,38 +163,79 @@ export class ObjectivesMain implements OnInit {
       this.transactionMsg = 'Transacción realizada correctamente.';
       this.transaccion = null;
       await this.loadData();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error in transaction:', e);
-      this.transactionMsg = 'No se pudo realizar la transacción.';
+      this.transactionMsg =
+        e?.error?.error?.message || 'No se pudo realizar la transacción.';
     } finally {
       this.cdr.markForCheck();
     }
   }
 
-  async completeObjetivo(id: string): Promise<void> {
+  async completeObjetivo(o: Objetivo): Promise<void> {
+    const confirmed = await this.dialogService.confirm({
+      title: 'COMPLETAR OBJETIVO',
+      message: `¿Marcar "${o.name}" como COMPLETADO? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Completar',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    this.actionMsg = '';
     try {
-      await this.objetivoService.complete(id);
+      await this.objetivoService.complete(o.id);
+      this.actionMsg = 'Objetivo completado.';
       await this.loadData();
-    } catch (e) {
-      console.error('Error completing objective:', e);
+    } catch (e: any) {
+      this.actionMsg = e?.error?.error?.message || 'No se pudo completar el objetivo.';
+    } finally {
+      this.cdr.markForCheck();
     }
   }
 
-  async cancelObjetivo(id: string): Promise<void> {
+  async cancelObjetivo(o: Objetivo): Promise<void> {
+    const confirmed = await this.dialogService.confirm({
+      title: 'CANCELAR OBJETIVO',
+      message: `¿Cancelar "${o.name}"? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Cancelar',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    this.actionMsg = '';
     try {
-      await this.objetivoService.cancel(id);
+      await this.objetivoService.cancel(o.id);
+      this.actionMsg = 'Objetivo cancelado.';
       await this.loadData();
-    } catch (e) {
-      console.error('Error cancelling objective:', e);
+    } catch (e: any) {
+      this.actionMsg = e?.error?.error?.message || 'No se pudo cancelar el objetivo.';
+    } finally {
+      this.cdr.markForCheck();
     }
   }
 
-  async deleteObjetivo(id: string): Promise<void> {
+  async deleteObjetivo(o: Objetivo): Promise<void> {
+    const confirmed = await this.dialogService.confirm({
+      title: 'ELIMINAR OBJETIVO',
+      message: `¿Eliminar "${o.name}"? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    this.actionMsg = '';
     try {
-      await this.objetivoService.delete(id);
+      await this.objetivoService.delete(o.id);
+      this.actionMsg = 'Objetivo eliminado.';
       await this.loadData();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error deleting objective:', e);
+      this.actionMsg = e?.error?.error?.message || 'No se pudo eliminar el objetivo.';
+    } finally {
+      this.cdr.markForCheck();
     }
   }
 }

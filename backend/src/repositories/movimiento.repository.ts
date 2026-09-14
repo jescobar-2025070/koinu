@@ -1,5 +1,10 @@
 import { Db } from '../config/db';
-import { Movimiento, MovimientoType } from '../entities/movimiento.entity';
+import {
+  Movimiento,
+  MovimientoType,
+  IncomeClassification,
+  ExpenseType,
+} from '../entities/movimiento.entity';
 
 interface MovimientoRow {
   id: string;
@@ -8,8 +13,11 @@ interface MovimientoRow {
   type: MovimientoType;
   income_category_id: string | null;
   expense_category_id: string | null;
+  objetivo_id: string | null;
   amount: number;
   description: string | null;
+  income_classification: IncomeClassification | null;
+  expense_type: ExpenseType | null;
   date: Date;
   created_at: Date;
   updated_at: Date;
@@ -24,8 +32,11 @@ function mapRow(row: MovimientoRow): Movimiento {
     type: row.type,
     incomeCategoryId: row.income_category_id,
     expenseCategoryId: row.expense_category_id,
+    objetivoId: row.objetivo_id,
     amount: row.amount,
     description: row.description,
+    incomeClassification: row.income_classification,
+    expenseType: row.expense_type,
     date: row.date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -33,14 +44,19 @@ function mapRow(row: MovimientoRow): Movimiento {
   };
 }
 
+const COLUMNS = `id, user_id, periodo_id, type, income_category_id, expense_category_id, objetivo_id, amount, description, income_classification, expense_type, date, created_at, updated_at, deleted_at`;
+
 interface MovimientoCreateData {
   userId: string;
   periodoId: string;
   type: MovimientoType;
   incomeCategoryId?: string | null;
   expenseCategoryId?: string | null;
+  objetivoId?: string | null;
   amount: number;
   description?: string;
+  incomeClassification?: IncomeClassification | null;
+  expenseType?: ExpenseType | null;
   date?: Date;
 }
 
@@ -49,7 +65,7 @@ export class MovimientoRepository {
 
   async findByUser(userId: string, periodId?: string): Promise<Movimiento[]> {
     let query = `
-      SELECT id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at
+      SELECT ${COLUMNS}
         FROM movimientos
        WHERE user_id = $1 AND deleted_at IS NULL`;
     const params: any[] = [userId];
@@ -66,7 +82,7 @@ export class MovimientoRepository {
 
   async findByPeriodo(periodId: string): Promise<Movimiento[]> {
     const result = await this.db.query<MovimientoRow>(
-      `SELECT id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at
+      `SELECT ${COLUMNS}
          FROM movimientos
         WHERE periodo_id = $1 AND deleted_at IS NULL
         ORDER BY date DESC, created_at DESC`,
@@ -77,7 +93,7 @@ export class MovimientoRepository {
 
   async findById(id: string): Promise<Movimiento | null> {
     const result = await this.db.query<MovimientoRow>(
-      `SELECT id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at
+      `SELECT ${COLUMNS}
          FROM movimientos
         WHERE id = $1 AND deleted_at IS NULL
         LIMIT 1`,
@@ -122,6 +138,41 @@ export class MovimientoRepository {
     };
   }
 
+  async findExpensesByPeriodo(periodoId: string): Promise<
+    { id: string; amount: number; createdAt: Date }[]
+  > {
+    const result = await this.db.query<{ id: string; amount: number; created_at: Date }>(
+      `SELECT id, amount, created_at
+         FROM movimientos
+        WHERE periodo_id = $1 AND type = 'EXPENSE' AND deleted_at IS NULL
+        ORDER BY created_at ASC`,
+      [periodoId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      amount: Number(row.amount),
+      createdAt: row.created_at,
+    }));
+  }
+
+  async getExpenseTotalByCategory(
+    periodoId: string,
+    expenseCategoryId: string,
+    excludeMovementId?: string,
+  ): Promise<number> {
+    let query = `
+      SELECT COALESCE(SUM(amount), 0) AS total
+        FROM movimientos
+       WHERE periodo_id = $1 AND type = 'EXPENSE' AND expense_category_id = $2 AND deleted_at IS NULL`;
+    const params: any[] = [periodoId, expenseCategoryId];
+    if (excludeMovementId) {
+      params.push(excludeMovementId);
+      query += ` AND id != $${params.length}`;
+    }
+    const result = await this.db.query<{ total: number }>(query, params);
+    return Number(result.rows[0]?.total ?? 0);
+  }
+
   async getCategoryBreakdown(periodoId: string): Promise<
     { categoryId: string | null; nombre: string; type: MovimientoType; total: number }[]
   > {
@@ -154,17 +205,20 @@ export class MovimientoRepository {
 
   async create(data: MovimientoCreateData): Promise<Movimiento> {
     const result = await this.db.query<MovimientoRow>(
-      `INSERT INTO movimientos (user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at`,
+      `INSERT INTO movimientos (user_id, periodo_id, type, income_category_id, expense_category_id, objetivo_id, amount, description, income_classification, expense_type, date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING ${COLUMNS}`,
       [
         data.userId,
         data.periodoId,
         data.type,
         data.incomeCategoryId ?? null,
         data.expenseCategoryId ?? null,
+        data.objetivoId ?? null,
         data.amount,
         data.description ?? null,
+        data.incomeClassification ?? null,
+        data.expenseType ?? null,
         data.date ?? new Date(),
       ],
     );
@@ -179,9 +233,24 @@ export class MovimientoRepository {
     return result.rowCount !== null && result.rowCount > 0;
   }
 
+  async deleteByObjetivoId(objetivoId: string): Promise<number> {
+    const result = await this.db.query(
+      `DELETE FROM movimientos WHERE objetivo_id = $1`,
+      [objetivoId],
+    );
+    return result.rowCount ?? 0;
+  }
+
   async update(
     id: string,
-    data: { amount?: number; description?: string; date?: Date },
+    data: {
+      amount?: number;
+      description?: string;
+      incomeClassification?: import('../entities/movimiento.entity').IncomeClassification | null;
+      expenseType?: import('../entities/movimiento.entity').ExpenseType | null;
+      objetivoId?: string | null;
+      date?: Date;
+    },
   ): Promise<Movimiento | null> {
     const updates: string[] = [];
     const params: any[] = [id];
@@ -192,6 +261,18 @@ export class MovimientoRepository {
     if (data.description !== undefined) {
       params.push(data.description);
       updates.push(`description = $${params.length}`);
+    }
+    if (data.incomeClassification !== undefined) {
+      params.push(data.incomeClassification);
+      updates.push(`income_classification = $${params.length}`);
+    }
+    if (data.expenseType !== undefined) {
+      params.push(data.expenseType);
+      updates.push(`expense_type = $${params.length}`);
+    }
+    if (data.objetivoId !== undefined) {
+      params.push(data.objetivoId);
+      updates.push(`objetivo_id = $${params.length}`);
     }
     if (data.date !== undefined) {
       params.push(data.date);
@@ -205,7 +286,7 @@ export class MovimientoRepository {
     const result = await this.db.query<MovimientoRow>(
       `UPDATE movimientos SET ${updates.join(', ')}
        WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id, user_id, periodo_id, type, income_category_id, expense_category_id, amount, description, date, created_at, updated_at, deleted_at`,
+       RETURNING ${COLUMNS}`,
       params,
     );
     return result.rows[0] ? mapRow(result.rows[0]) : null;

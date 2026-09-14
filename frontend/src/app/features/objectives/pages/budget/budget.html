@@ -40,10 +40,6 @@
             <span class="stat-label">PENDIENTE</span>
             <span class="stat-value">{{ formatCurrency(totalDisponible()) }}</span>
           </div>
-          <div class="summary-item">
-            <span class="stat-label">EXCEDENTE</span>
-            <span class="stat-value" [class.negative]="budget!.excedenteTotal > 0">{{ formatCurrency(budget!.excedenteTotal) }}</span>
-          </div>
         </div>
 
         <div class="allocation-form">
@@ -72,6 +68,8 @@
               <tr>
                 <th>CATEGORÍA</th>
                 <th>MONTO</th>
+                <th>CONSUMIDO</th>
+                <th>REMANENTE</th>
                 <th></th>
               </tr>
             </thead>
@@ -80,12 +78,14 @@
                 <tr>
                   <td>{{ getCategoryName(a.categoriaGastoId) }}</td>
                   <td>{{ formatCurrency(a.amount) }}</td>
+                  <td>{{ formatCurrency(consumedByCategory(a.categoriaGastoId)) }}</td>
+                  <td>{{ formatCurrency(remainingOf(a)) }}</td>
                   <td class="table-actions">
                     <button class="row-action" (click)="updateAllocation(a)" title="Editar monto">
-                      <span class="material-symbols-outlined" style="font-size:14px;">edit</span>
+                      <span class="material-symbols-outlined icon-sm">edit</span>
                     </button>
                     <button class="row-action danger" (click)="deleteAllocation(a)" title="Eliminar">
-                      <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
+                      <span class="material-symbols-outlined icon-sm">delete</span>
                     </button>
                   </td>
                 </tr>
@@ -97,35 +97,5 @@
         }
       </div>
     }
-
-    <div class="panel">
-      <div class="panel-title">EXCEDENTES (SOBREPRESUPUESTO)</div>
-      <div class="summary-row">
-        <div class="summary-item">
-          <span class="stat-label">TOTAL EXCEDENTE</span>
-          <span class="stat-value" [class.negative]="overrunsTotal > 0">{{ formatCurrency(overrunsTotal) }}</span>
-        </div>
-      </div>
-      @if (overruns.length > 0) {
-        <table class="budget-table">
-          <thead>
-            <tr>
-              <th>FECHA</th>
-              <th>MONTO</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (o of overruns; track o.id) {
-              <tr>
-                <td>{{ formatDate(o.createdAt) }}</td>
-                <td>{{ formatCurrency(o.amount) }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      } @else {
-        <div class="budget-empty">Sin excedentes hasta ahora: tus gastos están dentro del presupuesto.</div>
-      }
-    </div>
   }
 </div>

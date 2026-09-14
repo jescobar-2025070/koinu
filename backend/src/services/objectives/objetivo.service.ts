@@ -1,9 +1,12 @@
-import { pool } from '../../config/db';
+import { pool, withTransaction } from '../../config/db';
 import { AppError } from '../../errors/app-error';
 import { ErrorCodes } from '../../errors/error-codes';
-import { Objetivo, ObjetivoStatus } from '../../entities/objetivo.entity';
+import { Objetivo, ObjetivoPriority, ObjetivoStatus } from '../../entities/objetivo.entity';
 import { ObjetivoRepository } from '../../repositories/objetivo.repository';
+import { MovimientoRepository } from '../../repositories/movimiento.repository';
 import { PeriodoService } from '../periods/periodo.service';
+
+const OBJETIVO_PRIORITIES: ObjetivoPriority[] = ['ALTA', 'MEDIA', 'BAJA'];
 
 export interface CrearObjetivoInput {
   periodoId?: string;
@@ -12,6 +15,7 @@ export interface CrearObjetivoInput {
   targetAmount: number;
   deadline?: string;
   startDate?: string;
+  priority?: ObjetivoPriority;
 }
 
 export class ObjetivoService {
@@ -51,6 +55,14 @@ export class ObjetivoService {
       });
     }
 
+    const priority = this.normalizePriority(data.priority, 'MEDIA');
+    if (data.priority !== undefined && priority === null) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'La prioridad debe ser ALTA, MEDIA o BAJA.',
+        statusCode: 400,
+      });
+    }
+
     if (data.periodoId) {
       await this.periodoService.findById(data.periodoId, userId);
     }
@@ -63,6 +75,7 @@ export class ObjetivoService {
       targetAmount: data.targetAmount,
       deadline: data.deadline ? new Date(data.deadline) : null,
       startDate: data.startDate ? new Date(data.startDate) : new Date(),
+      priority: (priority ?? 'MEDIA') as ObjetivoPriority,
     });
   }
 
@@ -76,6 +89,7 @@ export class ObjetivoService {
       deadline?: string;
       startDate?: string;
       periodoId?: string | null;
+      priority?: ObjetivoPriority;
     },
   ): Promise<Objetivo> {
     await this.assertOwned(id, userId);
@@ -87,6 +101,7 @@ export class ObjetivoService {
       deadline?: Date | null;
       startDate?: Date | null;
       periodoId?: string | null;
+      priority?: ObjetivoPriority;
     } = {};
 
     if (data.name !== undefined) payload.name = data.name.trim();
@@ -108,6 +123,16 @@ export class ObjetivoService {
       }
       payload.periodoId = data.periodoId;
     }
+    if (data.priority !== undefined) {
+      const priority = this.normalizePriority(data.priority, undefined);
+      if (priority === null) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+          message: 'La prioridad debe ser ALTA, MEDIA o BAJA.',
+          statusCode: 400,
+        });
+      }
+      payload.priority = priority;
+    }
 
     const updated = await this.objetivoRepository.update(id, payload);
     if (!updated) {
@@ -122,13 +147,20 @@ export class ObjetivoService {
 
   async delete(id: string, userId: string): Promise<void> {
     const objetivo = await this.assertOwned(id, userId);
-    const deleted = await this.objetivoRepository.delete(objetivo.id);
-    if (!deleted) {
-      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
-        message: 'Error al eliminar el objetivo.',
-        statusCode: 500,
-      });
-    }
+
+    await withTransaction(async (client) => {
+      const objetivoRepo = new ObjetivoRepository(client);
+      const movimientoRepo = new MovimientoRepository(client);
+
+      await movimientoRepo.deleteByObjetivoId(objetivo.id);
+      const deleted = await objetivoRepo.delete(objetivo.id);
+      if (!deleted) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'Error al eliminar el objetivo.',
+          statusCode: 500,
+        });
+      }
+    });
   }
 
   async deposit(id: string, userId: string, amount: number): Promise<Objetivo> {
@@ -142,15 +174,40 @@ export class ObjetivoService {
       });
     }
 
-    const updated = await this.objetivoRepository.deposit(id, amount);
-    if (!updated) {
-      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
-        message: 'Error al depositar en el objetivo.',
-        statusCode: 500,
-      });
-    }
+    return withTransaction(async (client) => {
+      const objetivoRepo = new ObjetivoRepository(client);
+      const movimientoRepo = new MovimientoRepository(client);
 
-    return updated;
+      const periodoId = await this.resolveLinkedPeriodo(objetivo, userId, objetivoRepo);
+      const stats = await movimientoRepo.getStatsByPeriodo(periodoId);
+      const disponible = Number(stats.totalIngresos) - Number(stats.totalGastos);
+      if (amount > disponible) {
+        throw new AppError(ErrorCodes.INSUFFICIENT_FUNDS, {
+          message: `Fondos insuficientes. El aporte no puede superar el dinero disponible del período. Disponible: Q ${this.formatCantidad(disponible)}.`,
+          statusCode: 422,
+        });
+      }
+
+      const updated = await objetivoRepo.deposit(id, amount);
+      if (!updated) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'Error al depositar en el objetivo.',
+          statusCode: 500,
+        });
+      }
+
+      await movimientoRepo.create({
+        userId,
+        periodoId,
+        type: 'EXPENSE',
+        objetivoId: id,
+        amount,
+        description: `Aporte a objetivo: ${objetivo.name}`,
+        date: new Date(),
+      });
+
+      return updated;
+    });
   }
 
   async withdraw(id: string, userId: string, amount: number): Promise<Objetivo> {
@@ -171,15 +228,31 @@ export class ObjetivoService {
       });
     }
 
-    const updated = await this.objetivoRepository.withdraw(id, amount);
-    if (!updated) {
-      throw new AppError(ErrorCodes.INTERNAL_ERROR, {
-        message: 'Error al retirar del objetivo.',
-        statusCode: 500,
-      });
-    }
+    return withTransaction(async (client) => {
+      const objetivoRepo = new ObjetivoRepository(client);
+      const movimientoRepo = new MovimientoRepository(client);
 
-    return updated;
+      const periodoId = await this.resolveLinkedPeriodo(objetivo, userId, objetivoRepo);
+      const updated = await objetivoRepo.withdraw(id, amount);
+      if (!updated) {
+        throw new AppError(ErrorCodes.INTERNAL_ERROR, {
+          message: 'Error al retirar del objetivo.',
+          statusCode: 500,
+        });
+      }
+
+      await movimientoRepo.create({
+        userId,
+        periodoId,
+        type: 'INCOME',
+        objetivoId: id,
+        amount,
+        description: `Retiro de objetivo: ${objetivo.name}`,
+        date: new Date(),
+      });
+
+      return updated;
+    });
   }
 
   async complete(id: string, userId: string): Promise<Objetivo> {
@@ -205,6 +278,16 @@ export class ObjetivoService {
     return updated;
   }
 
+  private normalizePriority(value: string | undefined, fallback: ObjetivoPriority | undefined): ObjetivoPriority | null {
+    const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    if (!normalized) {
+      return fallback ?? null;
+    }
+    return OBJETIVO_PRIORITIES.includes(normalized as ObjetivoPriority)
+      ? (normalized as ObjetivoPriority)
+      : null;
+  }
+
   private assertActive(objetivo: Objetivo): void {
     if (objetivo.status !== 'ACTIVE') {
       throw new AppError(ErrorCodes.GOAL_NOT_ACTIVE, {
@@ -212,6 +295,52 @@ export class ObjetivoService {
         statusCode: 422,
       });
     }
+  }
+
+  /**
+   * Resuelve el período sobre el que opera un aporte/retiro. Si el objetivo
+   * ya está vinculado a un período, valida que esté activo. Si es un objetivo
+   * general (sin período), lo vincula automáticamente al período activo del
+   * usuario para que el aporte/retiro descuente/reponga el presupuesto.
+   */
+  private async resolveLinkedPeriodo(
+    objetivo: Objetivo,
+    userId: string,
+    objetivoRepo: ObjetivoRepository,
+  ): Promise<string> {
+    if (objetivo.periodoId) {
+      await this.assertPeriodoActivo(objetivo.periodoId, userId);
+      return objetivo.periodoId;
+    }
+
+    const activo = await this.periodoService.findActive(userId);
+    if (!activo) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message:
+          'No hay un período activo. Crea y activa un período para vincular el objetivo y registrar aportes o retiros.',
+        statusCode: 400,
+      });
+    }
+
+    await objetivoRepo.linkPeriodo(objetivo.id, activo.id);
+    return activo.id;
+  }
+
+  private async assertPeriodoActivo(periodoId: string, userId: string): Promise<void> {
+    const periodo = await this.periodoService.findById(periodoId, userId);
+    if (periodo.status !== 'ACTIVE') {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, {
+        message: 'Solo se pueden registrar aportes o retiros en un período activo.',
+        statusCode: 400,
+      });
+    }
+  }
+
+  private formatCantidad(amount: number): string {
+    return Number(amount).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   }
 
   private async assertOwned(id: string, userId: string): Promise<Objetivo> {

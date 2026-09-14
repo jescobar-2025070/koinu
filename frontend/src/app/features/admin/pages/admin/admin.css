@@ -6,6 +6,42 @@
   min-height: 0;
 }
 
+/* ---- Glass card (sección admin) ---- */
+.glass-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ---- Material Design 3 text tokens ---- */
+.text-headline-lg {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.text-title-md {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.text-body-md {
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.text-on-surface {
+  color: #fff;
+}
+
+.text-on-surface-variant {
+  color: var(--text-dim2);
+}
+
+/* ---- Layout admin ---- */
 .admin {
   flex: 1;
   display: flex;
@@ -46,7 +82,42 @@
   color: var(--text-dim2);
 }
 
-.admin__users {
+/* ---- Crear usuario ---- */
+.admin-create {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.admin-create__title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.admin-create__fields {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-create__fields .glow-pill {
+  max-width: 280px;
+}
+
+.admin-create__msg {
+  font-size: 0.78rem;
+  color: var(--green);
+  margin-top: 8px;
+}
+
+/* ---- Tabla de usuarios/períodos ---- */
+.admin__users,
+.admin__periods {
   padding: 20px 24px;
 }
 

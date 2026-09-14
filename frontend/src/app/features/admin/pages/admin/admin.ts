@@ -3,9 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { SidebarService } from '../../../../core/services/sidebar.service';
 import { AdminService } from '../../../../core/services/admin.service';
 import { SystemService } from '../../../../core/services/system.service';
+import { DialogService } from '../../../../core/services/dialog.service';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { User } from '../../../../core/auth/auth.models';
-import { SystemHealth } from '../../../../core/models/api.models';
+import { AdminPeriod, SystemHealth } from '../../../../core/models/api.models';
 
 @Component({
   selector: 'app-admin',
@@ -18,14 +19,24 @@ export class Admin implements OnInit {
   private readonly adminService = inject(AdminService);
   private readonly systemService = inject(SystemService);
   private readonly sidebarService = inject(SidebarService);
+  private readonly dialogService = inject(DialogService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   users: User[] = [];
+  periods: AdminPeriod[] = [];
   rolesModel = new Map<string, { ADMIN: boolean; USR: boolean }>();
   busy = new Map<string, boolean>();
   rowMsg = new Map<string, string>();
+  periodBusy = new Map<string, boolean>();
+  periodMsg = new Map<string, string>();
   loading = true;
   health: SystemHealth | null = null;
+
+  newUserEmail = '';
+  newUserPassword = '';
+  newUserAdmin = false;
+  creatingUser = false;
+  createMsg = '';
 
   ngOnInit(): void {
     this.sidebarService.setDashboard();
@@ -34,12 +45,14 @@ export class Admin implements OnInit {
 
   private async loadData(): Promise<void> {
     try {
-      const [users, health] = await Promise.all([
+      const [users, health, periods] = await Promise.all([
         this.adminService.listUsers(),
         this.systemService.health().catch(() => null),
+        this.adminService.listPeriods(),
       ]);
       this.users = users;
       this.health = health;
+      this.periods = periods;
       for (const u of users) {
         this.rolesModel.set(u.id, {
           ADMIN: u.roles.includes('ADMIN'),
@@ -102,7 +115,13 @@ export class Admin implements OnInit {
   }
 
   async deleteUser(u: User): Promise<void> {
-    if (!window.confirm(`¿Eliminar la cuenta de ${u.email}? Esta acción no se puede deshacer.`)) {
+    const confirmed = await this.dialogService.confirm({
+      title: 'ELIMINAR CUENTA',
+      message: `¿Eliminar la cuenta de ${u.email}? Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     this.setBusy(u.id, true);
@@ -115,6 +134,119 @@ export class Admin implements OnInit {
     } finally {
       this.setBusy(u.id, false);
       this.cdr.markForCheck();
+    }
+  }
+
+  async createUser(): Promise<void> {
+    const email = this.newUserEmail.trim();
+    if (!email || !this.newUserPassword) {
+      this.createMsg = 'Indica correo y contraseña para crear el usuario.';
+      return;
+    }
+    this.creatingUser = true;
+    this.createMsg = '';
+    try {
+      const roles = this.newUserAdmin ? ['ADMIN', 'USR'] : ['USR'];
+      const created = await this.adminService.createUser(email, this.newUserPassword, roles);
+      this.users = [created, ...this.users];
+      this.rolesModel.set(created.id, { ADMIN: created.roles.includes('ADMIN'), USR: created.roles.includes('USR') });
+      this.newUserEmail = '';
+      this.newUserPassword = '';
+      this.newUserAdmin = false;
+      this.createMsg = 'Usuario creado.';
+    } catch (e: any) {
+      this.createMsg = e?.error?.error?.message || 'No se pudo crear el usuario.';
+    } finally {
+      this.creatingUser = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async updateEmail(u: User): Promise<void> {
+    const next = await this.dialogService.prompt({
+      title: 'EDITAR CORREO',
+      message: `Usuario: ${u.email}`,
+      label: 'Nuevo correo electrónico',
+      value: u.email,
+      confirmLabel: 'Guardar',
+    });
+    if (next === null) {
+      return;
+    }
+    if (!next.trim() || next.trim() === u.email) {
+      return;
+    }
+    this.setBusy(u.id, true);
+    try {
+      const updated = await this.adminService.updateEmail(u.id, next.trim());
+      this.replaceUser(updated);
+      this.rowMsg.set(u.id, 'Correo actualizado.');
+    } catch (e: any) {
+      this.rowMsg.set(u.id, e?.error?.error?.message || 'No se pudo actualizar el correo.');
+    } finally {
+      this.setBusy(u.id, false);
+      this.cdr.markForCheck();
+    }
+  }
+
+  async resetPassword(u: User): Promise<void> {
+    const next = await this.dialogService.prompt({
+      title: 'RESTABLECER CONTRASEÑA',
+      message: `Nueva contraseña para ${u.email}:`,
+      label: 'Contraseña (mínimo 8 caracteres, letra y número)',
+      confirmLabel: 'Guardar',
+    });
+    if (next === null) {
+      return;
+    }
+    if (next.length < 8) {
+      this.rowMsg.set(u.id, 'La contraseña debe tener al menos 8 caracteres, una letra y un número.');
+      return;
+    }
+    this.setBusy(u.id, true);
+    try {
+      await this.adminService.resetPassword(u.id, next);
+      this.rowMsg.set(u.id, 'Contraseña restablecida. La sesión del usuario fue cerrada.');
+    } catch (e: any) {
+      this.rowMsg.set(u.id, e?.error?.error?.message || 'No se pudo restablecer la contraseña.');
+    } finally {
+      this.setBusy(u.id, false);
+      this.cdr.markForCheck();
+    }
+  }
+
+  canCancelPeriod(p: AdminPeriod): boolean {
+    return p.status === 'DRAFT' || p.status === 'ACTIVE';
+  }
+
+  async cancelPeriod(p: AdminPeriod): Promise<void> {
+    const confirmed = await this.dialogService.confirm({
+      title: 'CANCELAR PERÍODO',
+      message: `¿Cancelar el período "${p.name}" de ${p.userEmail}?`,
+      confirmLabel: 'Cancelar',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    this.periodBusy.set(p.id, true);
+    this.periodMsg.set(p.id, '');
+    try {
+      const updated = await this.adminService.cancelPeriod(p.id);
+      const index = this.periods.findIndex((x) => x.id === updated.id);
+      if (index >= 0) {
+        this.periods[index] = updated;
+      }
+      this.periodMsg.set(p.id, 'Período cancelado.');
+    } catch (e: any) {
+      this.periodMsg.set(p.id, e?.error?.error?.message || 'No se pudo cancelar el período.');
+    } finally {
+      this.periodBusy.set(p.id, false);
+      this.cdr.markForCheck();
+      setTimeout(() => {
+        this.periodMsg.delete(p.id);
+        this.cdr.markForCheck();
+      }, 4000);
     }
   }
 

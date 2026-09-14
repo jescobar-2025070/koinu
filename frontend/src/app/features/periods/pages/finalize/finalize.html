@@ -1,6 +1,18 @@
 <div class="view-form">
   <div class="section-title">FINALIZAR PERÍODO ACTUAL</div>
-  @if (currentPeriod) {
+  @if (finalized) {
+    <div class="finalize-done">
+      <div class="finalize-done-icon">✓</div>
+      <div class="finalize-done-title">{{ finalizedName }} fue finalizado</div>
+      <div class="finalize-done-hint">El informe final quedó guardado y disponible en Reportes para este período.</div>
+      <div class="finalize-actions">
+        <button class="btn-primary" (click)="goNewPeriod()">
+          Crear nuevo período
+        </button>
+        <button class="btn-secondary" (click)="goHistory()">Ver historial de períodos</button>
+      </div>
+    </div>
+  } @else if (currentPeriod) {
     <div class="form-grid">
       <div class="form-field">
         <label>PERÍODO</label>
@@ -20,10 +32,10 @@
       </div>
     </div>
     <div class="form-highlight">
-      <button class="btn-primary" style="max-width:260px;" (click)="finalizePeriod()" [disabled]="finalizing">Finalizar Período</button>
+      <button class="btn-primary" (click)="finalizePeriod()" [disabled]="finalizing">Finalizar Período</button>
       <div class="save-msg">{{ saveMessage }}</div>
     </div>
   } @else {
-    <div style="text-align:center; color:rgba(255,255,255,0.5); padding:40px;">No hay período abierto para finalizar</div>
+    <div class="table-empty" style="padding:40px;">No hay período abierto para finalizar</div>
   }
 </div>
